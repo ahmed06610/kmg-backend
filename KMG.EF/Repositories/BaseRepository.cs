@@ -17,7 +17,6 @@ namespace KMG.EF.Repositories
         public async Task<T> AddAsync(T entity)
         {
             await _context.Set<T>().AddAsync(entity);
-            await _context.SaveChangesAsync();
             return entity;
         }
 
@@ -28,10 +27,10 @@ namespace KMG.EF.Repositories
 
         public void Delete(T entity) => _context.Set<T>().Remove(entity);
 
-        public async Task DeleteAsync(T entity)
+        public Task DeleteAsync(T entity)
         {
             _context.Set<T>().Remove(entity);
-            await _context.SaveChangesAsync();
+            return Task.CompletedTask;
         }
 
         public void DeleteRange(IEnumerable<T> entities) => _context.Set<T>().RemoveRange(entities);

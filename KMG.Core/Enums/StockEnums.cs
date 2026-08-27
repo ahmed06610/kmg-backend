@@ -4,6 +4,7 @@ namespace KMG.Core.Enums
     {
         Purchase = 1,           // شراء
         IssueToProject = 2,     // صرف لمشروع
-        ReturnFromProject = 3   // مرتجع من مشروع
+        ReturnFromProject = 3,  // مرتجع من مشروع
+        OpeningBalance = 4      // رصيد افتتاحي عند إنشاء الخامة
     }
 }

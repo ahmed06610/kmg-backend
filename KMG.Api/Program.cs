@@ -73,28 +73,11 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddScoped<IAuthorizationHandler, AbilityAuthorizationHandler>();
 
-builder.Services.AddAuthorization(options =>
-{
-    using var scope = builder.Services.BuildServiceProvider().CreateScope();
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-    List<string> allAbilities;
-    try
-    {
-        allAbilities = context.Abilities.Select(a => a.AbilityName).ToList();
-    }
-    catch
-    {
-        // الداتابيز لسه متعملهاش migrate (أول تشغيل) - هنعمل Policies بعد أول migration
-        allAbilities = new List<string>();
-    }
-
-    foreach (var ability in allAbilities)
-    {
-        options.AddPolicy($"Ability:{ability}", policy =>
-            policy.Requirements.Add(new AbilityRequirement(ability)));
-    }
-});
+// Policies بتاعة "Ability:*" بتتبني ديناميكيًا وقت الطلب (مش وقت الإقلاع) عشان تشتغل صح
+// من أول تشغيل حتى لو الداتابيز لسه فاضية وقت الـ Startup، وعشان أي Ability جديدة تتضاف
+// بعد كده تشتغل على طول من غير الحاجة لإعادة تشغيل السيرفر.
+builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, AbilityPolicyProvider>();
 
 builder.Services.AddCors(options =>
 {

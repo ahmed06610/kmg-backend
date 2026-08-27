@@ -24,6 +24,7 @@ namespace KMG.Core.Services
             {
                 cashBox = new CashBox { TotalCash = 0, TotalCredit = 0 };
                 await _unitOfWork.CashBox.AddAsync(cashBox);
+                await _unitOfWork.CompleteAsync(); // نحتاج cashBox.Id فورًا لأي حركة هتتسجل بعد كده في نفس العملية
             }
             return cashBox;
         }
@@ -38,7 +39,8 @@ namespace KMG.Core.Services
             int? supplierId = null,
             int? projectExpenseId = null,
             int? missionId = null,
-            int? payrollPayoutId = null)
+            int? payrollPayoutId = null,
+            int? advanceId = null)
         {
             var cashBox = await GetOrCreateCashBoxAsync();
 
@@ -59,6 +61,7 @@ namespace KMG.Core.Services
                 ProjectExpenseId = projectExpenseId,
                 MissionId = missionId,
                 PayrollPayoutId = payrollPayoutId,
+                AdvanceId = advanceId,
                 CreatedByEmployeeId = createdByEmployeeId
             };
 

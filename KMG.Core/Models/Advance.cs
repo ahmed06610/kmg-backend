@@ -14,5 +14,7 @@ namespace KMG.Core.Models
 
         public int EmployeeId { get; set; }
         public virtual Employee Employee { get; set; } = null!;
+
+        public virtual ICollection<CashBoxTransaction> CashBoxTransactions { get; set; } = new List<CashBoxTransaction>();
     }
 }

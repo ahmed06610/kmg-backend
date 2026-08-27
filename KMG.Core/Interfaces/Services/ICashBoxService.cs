@@ -21,6 +21,7 @@ namespace KMG.Core.Interfaces.Services
             int? supplierId = null,
             int? projectExpenseId = null,
             int? missionId = null,
-            int? payrollPayoutId = null);
+            int? payrollPayoutId = null,
+            int? advanceId = null);
     }
 }

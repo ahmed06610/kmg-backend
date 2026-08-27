@@ -45,6 +45,7 @@ namespace KMG.Core.Services
             };
 
             await _unitOfWork.Employee.AddAsync(employee);
+            await _unitOfWork.CompleteAsync();
             return employee.Id;
         }
 

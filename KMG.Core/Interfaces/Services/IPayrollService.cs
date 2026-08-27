@@ -5,7 +5,7 @@ namespace KMG.Core.Interfaces.Services
     public interface IPayrollService
     {
         Task<List<AdvanceDTO>> GetAdvancesAsync(int? employeeId = null);
-        Task<AdvanceDTO> CreateAdvanceAsync(CreateAdvanceDTO model);
+        Task<AdvanceDTO> CreateAdvanceAsync(CreateAdvanceDTO model, int createdByEmployeeId);
 
         Task<List<PayrollAdjustmentDTO>> GetAdjustmentsAsync(int? employeeId = null);
         Task<PayrollAdjustmentDTO> CreateAdjustmentAsync(CreateAdjustmentDTO model);

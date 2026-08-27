@@ -29,20 +29,47 @@ namespace KMG.Core.Services
             return material == null ? null : MapMaterial(material);
         }
 
-        public async Task<int> CreateMaterialAsync(CreateMaterialDTO model)
+        public async Task<int> CreateMaterialAsync(CreateMaterialDTO model, int createdByEmployeeId)
         {
-            var material = new Material
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                Name = model.Name,
-                Unit = model.Unit,
-                UnitPrice = model.UnitPrice,
-                MinimumThreshold = model.MinimumThreshold,
-                Quantity = model.InitialQuantity,
-                LastUpdated = TimeHelper.NowInEgypt
-            };
+                var material = new Material
+                {
+                    Name = model.Name,
+                    Unit = model.Unit,
+                    UnitPrice = model.UnitPrice,
+                    MinimumThreshold = model.MinimumThreshold,
+                    Quantity = model.InitialQuantity,
+                    LastUpdated = TimeHelper.NowInEgypt
+                };
 
-            await _unitOfWork.Material.AddAsync(material);
-            return material.Id;
+                await _unitOfWork.Material.AddAsync(material);
+                await _unitOfWork.CompleteAsync(); // نحتاج material.Id عشان نربط بيه حركة الرصيد الافتتاحي
+
+                if (model.InitialQuantity > 0)
+                {
+                    await _unitOfWork.StockMovement.AddAsync(new StockMovement
+                    {
+                        MaterialId = material.Id,
+                        MovementType = MovementType.OpeningBalance,
+                        Quantity = model.InitialQuantity,
+                        UnitPriceAtTime = model.UnitPrice,
+                        MovementDate = TimeHelper.NowInEgypt,
+                        Notes = "رصيد افتتاحي عند إنشاء الخامة",
+                        CreatedByEmployeeId = createdByEmployeeId
+                    });
+                    await _unitOfWork.CompleteAsync();
+                }
+
+                await transaction.CommitAsync();
+                return material.Id;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<bool> UpdateMaterialAsync(UpdateMaterialDTO model)
@@ -140,6 +167,16 @@ namespace KMG.Core.Services
         {
             var material = await _unitOfWork.Material.GetByIdAsync(model.MaterialId)
                 ?? throw new Exception("الخامة غير موجودة");
+
+            var projectMovements = await _unitOfWork.StockMovement
+                .FindAllAsync(m => m.MaterialId == model.MaterialId && m.ProjectId == model.ProjectId
+                    && (m.MovementType == MovementType.IssueToProject || m.MovementType == MovementType.ReturnFromProject));
+
+            var netIssued = projectMovements.Where(m => m.MovementType == MovementType.IssueToProject).Sum(m => m.Quantity)
+                - projectMovements.Where(m => m.MovementType == MovementType.ReturnFromProject).Sum(m => m.Quantity);
+
+            if (model.Quantity > netIssued)
+                throw new Exception($"الكمية المرتجعة ({model.Quantity}) أكبر من صافي المصروف الفعلي لهذا المشروع من الخامة ({netIssued})");
 
             material.Quantity += model.Quantity;
             material.LastUpdated = TimeHelper.NowInEgypt;

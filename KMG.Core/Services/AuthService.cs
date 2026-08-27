@@ -104,6 +104,7 @@ namespace KMG.Core.Services
 
                 await AssignAbilitiesAsync(user.Id, model.RoleId, model.AbilityIds);
 
+                await _unitOfWork.CompleteAsync();
                 await transaction.CommitAsync();
 
                 return await BuildAuthResponseAsync(user, employee.Id);

@@ -85,6 +85,7 @@ namespace KMG.Core.Services
             };
 
             await _unitOfWork.Supplier.AddAsync(supplier);
+            await _unitOfWork.CompleteAsync();
             return supplier.Id;
         }
 
@@ -105,11 +106,26 @@ namespace KMG.Core.Services
 
         public async Task<SupplierPaymentDTO> RecordPaymentAsync(CreateSupplierPaymentDTO model, int createdByEmployeeId)
         {
+            if (model.AmountCash < 0 || model.AmountCredit < 0)
+                throw new Exception("لا يمكن أن تكون قيمة الكاش أو الكريديت سالبة");
+            if (model.AmountCash + model.AmountCredit <= 0)
+                throw new Exception("قيمة الدفعة يجب أن تكون أكبر من صفر");
+
             using var transaction = await _unitOfWork.BeginTransactionAsync();
             try
             {
-                var supplier = await _unitOfWork.Supplier.GetByIdAsync(model.SupplierId)
+                var supplier = await _unitOfWork.Supplier.GetQueryable(s => s.Id == model.SupplierId)
+                    .Include(s => s.StockMovements)
+                    .Include(s => s.Payments)
+                    .FirstOrDefaultAsync()
                     ?? throw new Exception("المورد غير موجود");
+
+                var totalPurchases = supplier.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime);
+                var totalPaid = supplier.Payments.Sum(p => p.Amount);
+                var outstanding = totalPurchases - totalPaid;
+
+                if (model.AmountCash + model.AmountCredit > outstanding)
+                    throw new Exception($"قيمة الدفعة أكبر من المستحق على المورد (المستحق: {outstanding})");
 
                 var payment = new SupplierPayment
                 {

@@ -285,6 +285,12 @@ namespace KMG.EF.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<CashBoxTransaction>()
+                .HasOne(t => t.Advance)
+                .WithMany(a => a.CashBoxTransactions)
+                .HasForeignKey(t => t.AdvanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CashBoxTransaction>()
                 .HasOne(t => t.CreatedByEmployee)
                 .WithMany()
                 .HasForeignKey(t => t.CreatedByEmployeeId)

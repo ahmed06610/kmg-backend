@@ -142,6 +142,7 @@ namespace KMG.Core.Services
                 };
 
                 await _unitOfWork.Project.AddAsync(project);
+                await _unitOfWork.CompleteAsync(); // نحتاج project.Id لو هننشئ مصاريف التأمين/الضريبة تحته
 
                 await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
                 {
@@ -150,6 +151,14 @@ namespace KMG.Core.Services
                     ActionDate = TimeHelper.NowInEgypt,
                     ActionDescription = "تم إنشاء المشروع"
                 });
+
+                // تأمين وضريبة المناقصة (لو موجودين) بيتسجلوا كمصروف نثري فعلي وحركة خزنة صادرة،
+                // مش مجرد حقول مخزّنة، عشان يدخلوا في صافي ربح المشروع ورصيد الخزنة فعليًا
+                if (model.TenderInsuranceAmount is > 0)
+                    await RecordTenderCostAsync(project, model.TenderInsuranceAmount.Value, ExpenseCategory.TenderInsurance, "تأمين المناقصة", createdByEmployeeId);
+
+                if (model.TenderTaxAmount is > 0)
+                    await RecordTenderCostAsync(project, model.TenderTaxAmount.Value, ExpenseCategory.TenderTax, "ضريبة المناقصة", createdByEmployeeId);
 
                 await _unitOfWork.CompleteAsync();
                 await transaction.CommitAsync();
@@ -161,6 +170,31 @@ namespace KMG.Core.Services
                 await _unitOfWork.RollbackAsync();
                 throw;
             }
+        }
+
+        private async Task RecordTenderCostAsync(Project project, decimal amount, ExpenseCategory category, string description, int createdByEmployeeId)
+        {
+            var expense = new ProjectExpense
+            {
+                ProjectId = project.Id,
+                Amount = amount,
+                Category = category,
+                Description = description,
+                ExpenseDate = project.CreatedAt,
+                CreatedByEmployeeId = createdByEmployeeId
+            };
+
+            await _unitOfWork.ProjectExpense.AddAsync(expense);
+            await _unitOfWork.CompleteAsync(); // نحتاج expense.Id عشان نربط بيه حركة الخزنة
+
+            await _cashBoxService.RecordTransactionAsync(
+                amountCash: -amount,
+                amountCredit: 0,
+                type: TransactionType.ProjectExpenseOut,
+                description: $"{description} - مشروع {project.ProjectCode}",
+                createdByEmployeeId: createdByEmployeeId,
+                projectId: project.Id,
+                projectExpenseId: expense.Id);
         }
 
         public async Task<bool> UpdateStatusAsync(UpdateProjectStatusDTO model, int employeeId)
@@ -185,11 +219,21 @@ namespace KMG.Core.Services
 
         public async Task<ProjectPaymentDTO> RecordPaymentAsync(CreateProjectPaymentDTO model, int createdByEmployeeId)
         {
+            if (model.AmountCash < 0 || model.AmountCredit < 0)
+                throw new Exception("لا يمكن أن تكون قيمة الكاش أو الكريديت سالبة");
+            if (model.AmountCash + model.AmountCredit <= 0)
+                throw new Exception("قيمة الدفعة يجب أن تكون أكبر من صفر");
+
             using var transaction = await _unitOfWork.BeginTransactionAsync();
             try
             {
-                var project = await _unitOfWork.Project.GetByIdAsync(model.ProjectId)
+                var project = await _unitOfWork.Project.GetQueryable(p => p.Id == model.ProjectId)
+                    .Include(p => p.Payments)
+                    .FirstOrDefaultAsync()
                     ?? throw new Exception("المشروع غير موجود");
+
+                if (model.AmountCash + model.AmountCredit > project.RemainingBalance)
+                    throw new Exception($"قيمة الدفعة أكبر من المتبقي على المشروع (المتبقي: {project.RemainingBalance})");
 
                 var payment = new ProjectPayment
                 {

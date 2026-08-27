@@ -31,6 +31,9 @@ namespace KMG.Core.Models
         public int? PayrollPayoutId { get; set; }
         public virtual PayrollPayout? PayrollPayout { get; set; }
 
+        public int? AdvanceId { get; set; }
+        public virtual Advance? Advance { get; set; }
+
         public int CreatedByEmployeeId { get; set; }
         public virtual Employee CreatedByEmployee { get; set; } = null!;
     }

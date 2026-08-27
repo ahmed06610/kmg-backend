@@ -31,26 +31,49 @@ namespace KMG.Core.Services
             return advances.Select(a => MapAdvance(a)).ToList();
         }
 
-        public async Task<AdvanceDTO> CreateAdvanceAsync(CreateAdvanceDTO model)
+        public async Task<AdvanceDTO> CreateAdvanceAsync(CreateAdvanceDTO model, int createdByEmployeeId)
         {
-            var advance = new Advance
+            if (model.TotalAmount <= 0)
+                throw new Exception("قيمة السلفة يجب أن تكون أكبر من صفر");
+
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                EmployeeId = model.EmployeeId,
-                TotalAmount = model.TotalAmount,
-                InstallmentAmount = model.InstallmentAmount,
-                RemainingAmount = model.TotalAmount,
-                IssueDate = TimeHelper.NowInEgypt,
-                Status = AdvanceStatus.Active,
-                Notes = model.Notes
-            };
+                var employee = await _unitOfWork.Employee.GetQueryable(e => e.Id == model.EmployeeId)
+                    .FirstOrDefaultAsync() ?? throw new Exception("الموظف غير موجود");
 
-            await _unitOfWork.Advance.AddAsync(advance);
-            await _unitOfWork.CompleteAsync();
+                var advance = new Advance
+                {
+                    EmployeeId = model.EmployeeId,
+                    TotalAmount = model.TotalAmount,
+                    InstallmentAmount = model.InstallmentAmount,
+                    RemainingAmount = model.TotalAmount,
+                    IssueDate = TimeHelper.NowInEgypt,
+                    Status = AdvanceStatus.Active,
+                    Notes = model.Notes
+                };
 
-            var employee = await _unitOfWork.Employee.GetQueryable(e => e.Id == model.EmployeeId)
-                .FirstAsync();
+                await _unitOfWork.Advance.AddAsync(advance);
+                await _unitOfWork.CompleteAsync(); // نحتاج advance.Id عشان نربط بيه حركة الخزنة
 
-            return MapAdvance(advance, employee);
+                await _cashBoxService.RecordTransactionAsync(
+                    amountCash: -model.TotalAmount,
+                    amountCredit: 0,
+                    type: TransactionType.AdvanceOut,
+                    description: $"تسليم سلفة للموظف: {employee.Name}",
+                    createdByEmployeeId: createdByEmployeeId,
+                    advanceId: advance.Id);
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return MapAdvance(advance, employee);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
         }
 
         // ---------------- Adjustments (خصومات / حوافز) ----------------
@@ -99,8 +122,18 @@ namespace KMG.Core.Services
             using var transaction = await _unitOfWork.BeginTransactionAsync();
             try
             {
+                var overlappingPayout = await _unitOfWork.PayrollPayout
+                    .GetQueryable(p => p.EmployeeId == model.EmployeeId
+                        && p.PeriodStart <= model.PeriodEnd && p.PeriodEnd >= model.PeriodStart)
+                    .FirstOrDefaultAsync();
+                if (overlappingPayout != null)
+                    throw new Exception("تم صرف راتب لهذا الموظف عن فترة متداخلة مع الفترة المطلوبة بالفعل");
+
                 var (preview, adjustmentsToApply, advancesToCharge, employee) =
                     await ComputeAsync(model.EmployeeId, model.PeriodStart, model.PeriodEnd);
+
+                if (preview.NetPaid < 0)
+                    throw new Exception($"صافي المستحق سالب ({preview.NetPaid}) - الخصومات وأقساط السلف أكبر من المستحق الأساسي");
 
                 var payout = new PayrollPayout
                 {

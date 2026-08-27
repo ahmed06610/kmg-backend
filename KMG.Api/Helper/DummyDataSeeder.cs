@@ -81,13 +81,13 @@ namespace KMG.Api.Helper
 
             // ---------------- الخامات ----------------
             var mAlucobond = await stockService.CreateMaterialAsync(new CreateMaterialDTO
-            { Name = "لوح ألوكوبند", Unit = "متر مربع", UnitPrice = 300, MinimumThreshold = 50, InitialQuantity = 0 });
+            { Name = "لوح ألوكوبند", Unit = "متر مربع", UnitPrice = 300, MinimumThreshold = 50, InitialQuantity = 0 }, ownerId);
             var mProfile = await stockService.CreateMaterialAsync(new CreateMaterialDTO
-            { Name = "بروفايل ألوميتال", Unit = "متر طولي", UnitPrice = 80, MinimumThreshold = 100, InitialQuantity = 0 });
+            { Name = "بروفايل ألوميتال", Unit = "متر طولي", UnitPrice = 80, MinimumThreshold = 100, InitialQuantity = 0 }, ownerId);
             var mGlass = await stockService.CreateMaterialAsync(new CreateMaterialDTO
-            { Name = "زجاج سيكوريت", Unit = "متر مربع", UnitPrice = 450, MinimumThreshold = 20, InitialQuantity = 0 });
+            { Name = "زجاج سيكوريت", Unit = "متر مربع", UnitPrice = 450, MinimumThreshold = 20, InitialQuantity = 0 }, ownerId);
             var mScrews = await stockService.CreateMaterialAsync(new CreateMaterialDTO
-            { Name = "مسامير تثبيت خاصة", Unit = "علبة", UnitPrice = 25, MinimumThreshold = 30, InitialQuantity = 0 });
+            { Name = "مسامير تثبيت خاصة", Unit = "علبة", UnitPrice = 25, MinimumThreshold = 30, InitialQuantity = 0 }, ownerId);
 
             await stockService.RecordPurchaseAsync(new CreatePurchaseDTO { MaterialId = mAlucobond, Quantity = 300, UnitPrice = 300, SupplierId = supplier1Id, Notes = "شراء أولي" }, ownerId);
             await stockService.RecordPurchaseAsync(new CreatePurchaseDTO { MaterialId = mProfile, Quantity = 500, UnitPrice = 80, SupplierId = supplier1Id, Notes = "شراء أولي" }, ownerId);
@@ -113,10 +113,8 @@ namespace KMG.Api.Helper
             await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mAlucobond, Quantity = 150, ProjectId = project1Id, Notes = "صرف للتصنيع" }, ownerId);
             await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mProfile, Quantity = 200, ProjectId = project1Id, Notes = "صرف للتصنيع" }, ownerId);
 
-            await projectService.RecordExpenseAsync(new CreateProjectExpenseDTO
-            { ProjectId = project1Id, Amount = 5000, Category = ExpenseCategory.TenderInsurance, Description = "تأمين ابتدائي على المناقصة", ExpenseDate = DateTime.UtcNow.AddDays(-20) }, ownerId);
-            await projectService.RecordExpenseAsync(new CreateProjectExpenseDTO
-            { ProjectId = project1Id, Amount = 2000, Category = ExpenseCategory.TenderTax, Description = "ضريبة المناقصة", ExpenseDate = DateTime.UtcNow.AddDays(-20) }, ownerId);
+            // ملحوظة: تأمين وضريبة المناقصة (5000 + 2000) اتسجلوا تلقائيًا كمصروف نثري وحركة خزنة
+            // وقت إنشاء المشروع نفسه (TenderInsuranceAmount/TenderTaxAmount في CreateProjectDTO فوق)
             await projectService.RecordExpenseAsync(new CreateProjectExpenseDTO
             { ProjectId = project1Id, Amount = 1500, Category = ExpenseCategory.Procedural, Description = "دفعة إجرائية", ExpenseDate = DateTime.UtcNow.AddDays(-15) }, ownerId);
 
@@ -195,7 +193,7 @@ namespace KMG.Api.Helper
 
             // ---------------- سلف وخصومات وحوافز ----------------
             await payrollService.CreateAdvanceAsync(new CreateAdvanceDTO
-            { EmployeeId = worker2Id, TotalAmount = 2000, InstallmentAmount = 200, Notes = "سلفة ظروف طارئة" });
+            { EmployeeId = worker2Id, TotalAmount = 2000, InstallmentAmount = 200, Notes = "سلفة ظروف طارئة" }, ownerId);
 
             await payrollService.CreateAdjustmentAsync(new CreateAdjustmentDTO
             { EmployeeId = worker1Id, Type = AdjustmentType.Bonus, Amount = 100, Reason = "مجهود إضافي في التركيب", Date = DateTime.UtcNow.AddDays(-6) });

@@ -30,7 +30,14 @@ namespace KMG.Api.Controllers
         [AuthorizeAbility("إدارة الرواتب")]
         public async Task<IActionResult> CreateAdvance([FromBody] CreateAdvanceDTO model)
         {
-            return Ok(await _payrollService.CreateAdvanceAsync(model));
+            try
+            {
+                return Ok(await _payrollService.CreateAdvanceAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpGet("adjustments")]

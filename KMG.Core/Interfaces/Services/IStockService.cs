@@ -6,7 +6,7 @@ namespace KMG.Core.Interfaces.Services
     {
         Task<List<MaterialDTO>> GetAllMaterialsAsync();
         Task<MaterialDTO?> GetMaterialByIdAsync(int id);
-        Task<int> CreateMaterialAsync(CreateMaterialDTO model);
+        Task<int> CreateMaterialAsync(CreateMaterialDTO model, int createdByEmployeeId);
         Task<bool> UpdateMaterialAsync(UpdateMaterialDTO model);
 
         Task<List<StockMovementDTO>> GetMovementsAsync(int? materialId = null, int? projectId = null);

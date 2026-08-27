@@ -38,7 +38,7 @@ namespace KMG.Api.Controllers
         [AuthorizeAbility("إدارة المخزن")]
         public async Task<IActionResult> CreateMaterial([FromBody] CreateMaterialDTO model)
         {
-            var id = await _stockService.CreateMaterialAsync(model);
+            var id = await _stockService.CreateMaterialAsync(model, CurrentEmployeeId);
             return Ok(id);
         }
 

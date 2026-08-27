@@ -175,7 +175,7 @@ namespace KMG.Core.Services
                     await _cashBoxService.RecordTransactionAsync(
                         amountCash: -extra,
                         amountCredit: 0,
-                        type: TransactionType.MissionSettlementIn,
+                        type: TransactionType.MissionSettlementOut,
                         description: $"سداد فارق عهدة مأمورية لمشروع {mission.Project.ProjectCode}",
                         createdByEmployeeId: settledByEmployeeId,
                         projectId: mission.ProjectId,

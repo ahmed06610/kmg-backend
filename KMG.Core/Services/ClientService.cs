@@ -74,6 +74,7 @@ namespace KMG.Core.Services
             };
 
             await _unitOfWork.Client.AddAsync(client);
+            await _unitOfWork.CompleteAsync();
             return client.Id;
         }
 
