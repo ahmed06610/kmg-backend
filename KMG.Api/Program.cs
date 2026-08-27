@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Diagnostics;
 using KMG.Api.Authorization;
 using KMG.Core.Authorization;
 using KMG.Core.Helper;
@@ -113,6 +114,20 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// معالج أخطاء عام - بيمنع تسريب الـ Stack Trace وهيدرز الطلب (زي الـ JWT) للعميل،
+// وبيرجع نفس شكل الرسالة (ex.Message) اللي الكونترولرز التانية بترجعه من الـ try/catch بتاعها يدويًا،
+// عشان أي Endpoint نسي try/catch (زي SupplierController.RecordPayment) يفضل آمن برضه
+app.UseExceptionHandler(exceptionHandlerApp =>
+{
+    exceptionHandlerApp.Run(async context =>
+    {
+        var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await context.Response.WriteAsJsonAsync(new { message = exception?.Message ?? "حدث خطأ غير متوقع" });
+    });
+});
 
 using (var scope = app.Services.CreateScope())
 {
