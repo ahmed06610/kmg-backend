@@ -18,11 +18,13 @@ namespace KMG.Core.Services
 
         public async Task<DashboardDTO> GetDashboardAsync()
         {
+            // AsSplitQuery() لتفادي انفجار عدد الصفوف من ضرب الكولكشنز في بعض (نفس مشكلة ProjectService)
             var projects = await _unitOfWork.Project.GetQueryable(null)
                 .Include(p => p.Payments)
                 .Include(p => p.Expenses)
                 .Include(p => p.StockMovements)
                 .Include(p => p.Missions).ThenInclude(m => m.MissionWorkers).ThenInclude(w => w.Employee)
+                .AsSplitQuery()
                 .ToListAsync();
 
             var totalIncome = projects.Sum(p => p.TotalCollected);
@@ -37,6 +39,7 @@ namespace KMG.Core.Services
             var suppliers = await _unitOfWork.Supplier.GetQueryable(null)
                 .Include(s => s.StockMovements)
                 .Include(s => s.Payments)
+                .AsSplitQuery()
                 .ToListAsync();
 
             var suppliersWithBalance = suppliers.Count(s =>
@@ -48,6 +51,26 @@ namespace KMG.Core.Services
             var supplierPaymentsThisMonth = suppliers.SelectMany(s => s.Payments)
                 .Where(p => p.PaymentDate >= monthStart)
                 .Sum(p => p.Amount);
+
+            var openMissionsCount = projects.SelectMany(p => p.Missions).Count(m => m.Status == MissionStatus.Open);
+
+            var totalOutstandingAdvances = (await _unitOfWork.Advance.GetAllAsync())
+                .Where(a => a.Status == AdvanceStatus.Active)
+                .Sum(a => a.RemainingAmount);
+
+            var clientsWithBalance = projects
+                .GroupBy(p => p.ClientId)
+                .Count(g => g.Sum(p => p.RemainingBalance) > 0);
+
+            var recentActivity = (await _unitOfWork.CashBoxTransaction.GetAllAsync())
+                .OrderByDescending(t => t.TransactionDate)
+                .Take(6)
+                .Select(t => new RecentActivityDTO
+                {
+                    Description = t.Description,
+                    Amount = t.AmountCash + t.AmountCredit,
+                    Date = t.TransactionDate
+                }).ToList();
 
             return new DashboardDTO
             {
@@ -68,7 +91,11 @@ namespace KMG.Core.Services
                 CashBoxCredit = cashBox?.TotalCredit ?? 0,
                 CashBoxTotal = cashBox?.TotalBalance ?? 0,
                 SuppliersWithOutstandingBalanceCount = suppliersWithBalance,
-                SupplierPaymentsThisMonth = supplierPaymentsThisMonth
+                SupplierPaymentsThisMonth = supplierPaymentsThisMonth,
+                OpenMissionsCount = openMissionsCount,
+                TotalOutstandingAdvances = totalOutstandingAdvances,
+                ClientsWithOutstandingBalanceCount = clientsWithBalance,
+                RecentActivity = recentActivity
             };
         }
     }

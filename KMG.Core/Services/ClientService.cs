@@ -31,6 +31,7 @@ namespace KMG.Core.Services
                 .Include(c => c.Projects).ThenInclude(p => p.StockMovements)
                 .Include(c => c.Projects).ThenInclude(p => p.Expenses)
                 .Include(c => c.Projects).ThenInclude(p => p.Missions).ThenInclude(m => m.MissionWorkers).ThenInclude(w => w.Employee)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync();
 
             if (client == null) return null;

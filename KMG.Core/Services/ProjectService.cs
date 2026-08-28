@@ -29,8 +29,12 @@ namespace KMG.Core.Services
 
         public async Task<List<ProjectListDTO>> GetAllAsync()
         {
+            // AsSplitQuery() ضروري هنا: من غير كده EF بيعمل LEFT JOIN واحد بين كل الكولكشنز
+            // (Payments × Expenses × StockMovements × Missions×Workers) في نفس الوقت، فعدد الصفوف
+            // بيتضاعف (cartesian explosion) وده كان بيخلي الاستعلام ده ياخد 25+ ثانية مع بيانات حقيقية
             var projects = await IncludeForFinancials(_unitOfWork.Project.GetQueryable(null))
                 .OrderByDescending(p => p.CreatedAt)
+                .AsSplitQuery()
                 .ToListAsync();
 
             return projects.Select(MapList).ToList();
@@ -43,6 +47,7 @@ namespace KMG.Core.Services
                 .Include(p => p.StockMovements).ThenInclude(m => m.CreatedByEmployee)
                 .Include(p => p.Attachments).ThenInclude(a => a.UploadedByEmployee)
                 .Include(p => p.AuditLogs).ThenInclude(a => a.Employee)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync();
 
             if (project == null) return null;
@@ -61,6 +66,9 @@ namespace KMG.Core.Services
                 NetProfit = list.NetProfit,
                 CreatedAt = list.CreatedAt,
                 ClientId = project.ClientId,
+                ClientPhone = project.Client.Phone,
+                ClientEmail = project.Client.Email,
+                ClientAddress = project.Client.Address,
                 Description = project.Description,
                 TenderInsuranceAmount = project.TenderInsuranceAmount,
                 TenderTaxAmount = project.TenderTaxAmount,

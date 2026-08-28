@@ -24,6 +24,7 @@ namespace KMG.Core.Services
             var suppliers = await _unitOfWork.Supplier.GetQueryable(null)
                 .Include(s => s.StockMovements)
                 .Include(s => s.Payments)
+                .AsSplitQuery()
                 .ToListAsync();
             return suppliers.Select(MapList).ToList();
         }
@@ -33,6 +34,7 @@ namespace KMG.Core.Services
             var supplier = await _unitOfWork.Supplier.GetQueryable(s => s.Id == id)
                 .Include(s => s.StockMovements).ThenInclude(sm => sm.Material)
                 .Include(s => s.Payments)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync();
 
             if (supplier == null) return null;
@@ -117,6 +119,7 @@ namespace KMG.Core.Services
                 var supplier = await _unitOfWork.Supplier.GetQueryable(s => s.Id == model.SupplierId)
                     .Include(s => s.StockMovements)
                     .Include(s => s.Payments)
+                    .AsSplitQuery()
                     .FirstOrDefaultAsync()
                     ?? throw new Exception("المورد غير موجود");
 
