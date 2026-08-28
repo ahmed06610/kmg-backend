@@ -14,6 +14,7 @@ namespace KMG.Core.DTOs.Employee
         public string? ManagerName { get; set; }
         public bool Suspended { get; set; }
         public bool HasLoginAccount { get; set; }
+        public decimal RemainingAdvances { get; set; }
     }
 
     public class CreateWorkerDTO

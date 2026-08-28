@@ -1,4 +1,5 @@
 using KMG.Core.DTOs.Employee;
+using KMG.Core.Enums;
 using KMG.Core.Helper;
 using KMG.Core.Interfaces;
 using KMG.Core.Interfaces.Services;
@@ -16,7 +17,7 @@ namespace KMG.Core.Services
         }
 
         private static IQueryable<Models.Employee> IncludeAll(IQueryable<Models.Employee> query) =>
-            query.Include(e => e.ApplicationUser).Include(e => e.Manager);
+            query.Include(e => e.ApplicationUser).Include(e => e.Manager).Include(e => e.Advances);
 
         public async Task<List<EmployeeListDTO>> GetAllAsync()
         {
@@ -60,7 +61,8 @@ namespace KMG.Core.Services
             WageAmount = e.WageAmount,
             ManagerName = e.Manager?.Name,
             Suspended = e.Suspended,
-            HasLoginAccount = e.ApplicationUserId != null
+            HasLoginAccount = e.ApplicationUserId != null,
+            RemainingAdvances = e.Advances.Where(a => a.Status == AdvanceStatus.Active).Sum(a => a.RemainingAmount)
         };
     }
 }
