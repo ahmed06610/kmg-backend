@@ -19,6 +19,11 @@ namespace KMG.Core.DTOs.Dashboard
 
         public int SuppliersWithOutstandingBalanceCount { get; set; }
         public decimal SupplierPaymentsThisMonth { get; set; }
+
+        public int OpenMissionsCount { get; set; }
+        public decimal TotalOutstandingAdvances { get; set; }
+        public int ClientsWithOutstandingBalanceCount { get; set; }
+        public List<RecentActivityDTO> RecentActivity { get; set; } = new();
     }
 
     public class ProjectsByTypeDTO
@@ -26,5 +31,12 @@ namespace KMG.Core.DTOs.Dashboard
         public string ProjectType { get; set; } = string.Empty;
         public int Count { get; set; }
         public decimal TotalValue { get; set; }
+    }
+
+    public class RecentActivityDTO
+    {
+        public string Description { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public DateTime Date { get; set; }
     }
 }
