@@ -19,6 +19,9 @@ namespace KMG.Core.DTOs.Project
     public class ProjectDetailsDTO : ProjectListDTO
     {
         public int ClientId { get; set; }
+        public string? ClientPhone { get; set; }
+        public string? ClientEmail { get; set; }
+        public string? ClientAddress { get; set; }
         public string? Description { get; set; }
         public decimal? TenderInsuranceAmount { get; set; }
         public decimal? TenderTaxAmount { get; set; }
