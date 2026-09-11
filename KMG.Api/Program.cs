@@ -140,13 +140,13 @@ using (var scope = app.Services.CreateScope())
         await KMG.Api.Helper.DummyDataSeeder.SeedAsync(app.Services);
 }
 
-if (app.Environment.IsDevelopment())
-{
+
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // لخدمة مرفقات المشاريع المرفوعة تحت wwwroot/uploads
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();

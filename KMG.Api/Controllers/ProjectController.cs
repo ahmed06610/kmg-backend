@@ -84,5 +84,34 @@ namespace KMG.Api.Controllers
         {
             return Ok(await _projectService.AddAttachmentAsync(model, CurrentEmployeeId));
         }
+
+        // حد أقصى 20 ميجا للملف الواحد - استضافة مشتركة ومساحة تخزين محدودة
+        private const long MaxUploadBytes = 20 * 1024 * 1024;
+
+        [HttpPost("attachments/upload")]
+        [AuthorizeAbility("إدارة المشاريع")]
+        [RequestSizeLimit(MaxUploadBytes)]
+        public async Task<IActionResult> UploadAttachment(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("لم يتم اختيار ملف");
+            if (file.Length > MaxUploadBytes)
+                return BadRequest("حجم الملف أكبر من الحد المسموح (20 ميجا)");
+
+            var uploadsRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "projects");
+            Directory.CreateDirectory(uploadsRoot);
+
+            var safeExtension = Path.GetExtension(file.FileName);
+            var storedFileName = $"{Guid.NewGuid()}{safeExtension}";
+            var fullPath = Path.Combine(uploadsRoot, storedFileName);
+
+            using (var stream = new FileStream(fullPath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/projects/{storedFileName}";
+            return Ok(new { fileUrl, fileName = file.FileName });
+        }
     }
 }
