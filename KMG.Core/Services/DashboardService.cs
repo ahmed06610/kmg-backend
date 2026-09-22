@@ -105,6 +105,7 @@ namespace KMG.Core.Services
                 .Select(p => new ActiveProjectSummaryDTO
                 {
                     Id = p.Id,
+                    Name = p.Name,
                     ProjectCode = p.ProjectCode,
                     ClientName = p.Client.Name,
                     Status = p.Status.ToString(),

@@ -50,6 +50,66 @@ namespace KMG.Api.Controllers
             return result ? Ok() : NotFound();
         }
 
+        [HttpDelete("materials/{id}")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> DeleteMaterial(int id)
+        {
+            try
+            {
+                var result = await _stockService.DeleteMaterialAsync(id);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("categories")]
+        [AuthorizeAbility("عرض المخزن")]
+        public async Task<IActionResult> GetAllCategories()
+        {
+            return Ok(await _stockService.GetAllCategoriesAsync());
+        }
+
+        [HttpPost("categories")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> CreateCategory([FromBody] CreateMaterialCategoryDTO model)
+        {
+            var id = await _stockService.CreateCategoryAsync(model);
+            return Ok(id);
+        }
+
+        [HttpPut("categories")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> UpdateCategory([FromBody] UpdateMaterialCategoryDTO model)
+        {
+            try
+            {
+                var result = await _stockService.UpdateCategoryAsync(model);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("categories/{id}")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> DeleteCategory(int id)
+        {
+            try
+            {
+                var result = await _stockService.DeleteCategoryAsync(id);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("movements")]
         [AuthorizeAbility("عرض المخزن")]
         public async Task<IActionResult> GetMovements([FromQuery] int? materialId, [FromQuery] int? projectId)

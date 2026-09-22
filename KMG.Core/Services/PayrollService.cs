@@ -76,6 +76,74 @@ namespace KMG.Core.Services
             }
         }
 
+        public async Task<AdvanceDTO> UpdateAdvanceAsync(UpdateAdvanceDTO model, int employeeId)
+        {
+            if (model.TotalAmount <= 0)
+                throw new Exception("قيمة السلفة يجب أن تكون أكبر من صفر");
+
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var advance = await _unitOfWork.Advance.GetQueryable(a => a.Id == model.Id)
+                    .Include(a => a.Employee)
+                    .FirstOrDefaultAsync() ?? throw new Exception("السلفة غير موجودة");
+
+                if (advance.RemainingAmount != advance.TotalAmount)
+                    throw new Exception("لا يمكن تعديل سلفة تم خصم أقساط منها بالفعل");
+
+                await _cashBoxService.ReverseAsync(t => t.AdvanceId == advance.Id);
+
+                advance.TotalAmount = model.TotalAmount;
+                advance.InstallmentAmount = model.InstallmentAmount;
+                advance.RemainingAmount = model.TotalAmount;
+                advance.Notes = model.Notes;
+                _unitOfWork.Advance.Update(advance);
+
+                await _cashBoxService.RecordTransactionAsync(
+                    amountCash: -model.TotalAmount,
+                    amountCredit: 0,
+                    type: TransactionType.AdvanceOut,
+                    description: $"تعديل سلفة للموظف: {advance.Employee.Name}",
+                    createdByEmployeeId: employeeId,
+                    advanceId: advance.Id);
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return MapAdvance(advance);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteAdvanceAsync(int id)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var advance = await _unitOfWork.Advance.GetByIdAsync(id);
+                if (advance == null) return false;
+
+                if (advance.RemainingAmount != advance.TotalAmount)
+                    throw new Exception("لا يمكن حذف سلفة تم خصم أقساط منها بالفعل");
+
+                await _cashBoxService.ReverseAsync(t => t.AdvanceId == id);
+                _unitOfWork.Advance.Delete(advance);
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
         // ---------------- Adjustments (خصومات / حوافز) ----------------
 
         public async Task<List<PayrollAdjustmentDTO>> GetAdjustmentsAsync(int? employeeId = null)
@@ -107,6 +175,38 @@ namespace KMG.Core.Services
                 .FirstAsync();
 
             return MapAdjustment(adjustment, employee);
+        }
+
+        public async Task<PayrollAdjustmentDTO> UpdateAdjustmentAsync(UpdateAdjustmentDTO model)
+        {
+            var adjustment = await _unitOfWork.PayrollAdjustment.GetQueryable(a => a.Id == model.Id)
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync() ?? throw new Exception("التسوية غير موجودة");
+
+            if (adjustment.Applied)
+                throw new Exception("لا يمكن تعديل تسوية تم تطبيقها بالفعل في راتب مصروف");
+
+            adjustment.Type = model.Type;
+            adjustment.Amount = model.Amount;
+            adjustment.Reason = model.Reason;
+            adjustment.Date = model.Date;
+            _unitOfWork.PayrollAdjustment.Update(adjustment);
+            await _unitOfWork.CompleteAsync();
+
+            return MapAdjustment(adjustment);
+        }
+
+        public async Task<bool> DeleteAdjustmentAsync(int id)
+        {
+            var adjustment = await _unitOfWork.PayrollAdjustment.GetByIdAsync(id);
+            if (adjustment == null) return false;
+
+            if (adjustment.Applied)
+                throw new Exception("لا يمكن حذف تسوية تم تطبيقها بالفعل في راتب مصروف");
+
+            _unitOfWork.PayrollAdjustment.Delete(adjustment);
+            await _unitOfWork.CompleteAsync();
+            return true;
         }
 
         // ---------------- Payroll run ----------------

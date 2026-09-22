@@ -51,6 +51,7 @@ namespace KMG.Core.Services
                 Projects = client.Projects.Select(p => new ClientProjectSummaryDTO
                 {
                     Id = p.Id,
+                    Name = p.Name,
                     ProjectCode = p.ProjectCode,
                     ProjectType = p.ProjectType.ToString(),
                     Status = p.Status.ToString(),
@@ -92,6 +93,23 @@ namespace KMG.Core.Services
             _unitOfWork.Client.Update(client);
             await _unitOfWork.CompleteAsync();
             return true;
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var client = await _unitOfWork.Client.GetByIdAsync(id);
+            if (client == null) return false;
+
+            try
+            {
+                _unitOfWork.Client.Delete(client);
+                await _unitOfWork.CompleteAsync();
+                return true;
+            }
+            catch (DbUpdateException)
+            {
+                throw new Exception("لا يمكن حذف عميل له مشاريع مسجلة في النظام");
+            }
         }
 
         private static ClientListDTO MapList(Client c) => new()

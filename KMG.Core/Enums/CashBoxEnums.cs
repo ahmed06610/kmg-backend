@@ -10,6 +10,14 @@ namespace KMG.Core.Enums
         PayrollOut = 6,            // صرف راتب/أجر
         StockPurchaseOut = 7,      // دفع نقدي وقت شراء خامة (اختياري لو الشراء كاش وقتها)
         AdvanceOut = 8,            // تسليم سلفة لموظف
-        MissionSettlementOut = 9   // سداد فارق عهدة (لو المصروف أكتر من العهدة)
+        MissionSettlementOut = 9,  // سداد فارق عهدة (لو المصروف أكتر من العهدة)
+        MiscExpenseOut = 10        // مصروف نثري عام (مش مرتبط بمشروع معين)
+    }
+
+    public enum MiscExpenseCategory
+    {
+        Administrative = 1, // إداري
+        Operational = 2,    // تشغيلي
+        Other = 3           // أخرى
     }
 }

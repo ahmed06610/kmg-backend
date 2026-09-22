@@ -62,6 +62,7 @@ namespace KMG.Core.DTOs.Dashboard
     public class ActiveProjectSummaryDTO
     {
         public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string ProjectCode { get; set; } = string.Empty;
         public string ClientName { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;

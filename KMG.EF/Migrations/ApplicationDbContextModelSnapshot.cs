@@ -78,6 +78,126 @@ namespace KMG.EF.Migrations
                     b.ToTable("Advances");
                 });
 
+            modelBuilder.Entity("KMG.Core.Models.AiPromptConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("PromptText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByEmployeeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedByEmployeeId");
+
+                    b.ToTable("AiPromptConfigs");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.AiTenderResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool?>("AiDocumentRelevant")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("BookletFee")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BusinessCategory")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContactInfo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("DaysUntilDeadline")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DocumentEntity")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DocumentReadStatus")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DocumentSubmitBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("FirstReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InitialInsurance")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDismissed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IsNewCategory")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("IssuingEntity")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MatchReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MatchedVia")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MaterialsRequired")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Quantities")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RelevanceNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ScopeOfWork")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceSite")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubmissionDeadline")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TenderId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("TenderTitle")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenderId")
+                        .IsUnique();
+
+                    b.ToTable("AiTenderResults");
+                });
+
             modelBuilder.Entity("KMG.Core.Models.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
@@ -196,6 +316,9 @@ namespace KMG.EF.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("MiscExpenseId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("MissionId")
                         .HasColumnType("int");
 
@@ -208,7 +331,13 @@ namespace KMG.EF.Migrations
                     b.Property<int?>("ProjectId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ProjectPaymentId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SupplierPaymentId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("TransactionDate")
@@ -225,6 +354,8 @@ namespace KMG.EF.Migrations
 
                     b.HasIndex("CreatedByEmployeeId");
 
+                    b.HasIndex("MiscExpenseId");
+
                     b.HasIndex("MissionId");
 
                     b.HasIndex("PayrollPayoutId");
@@ -233,7 +364,11 @@ namespace KMG.EF.Migrations
 
                     b.HasIndex("ProjectId");
 
+                    b.HasIndex("ProjectPaymentId");
+
                     b.HasIndex("SupplierId");
+
+                    b.HasIndex("SupplierPaymentId");
 
                     b.ToTable("CashBoxTransactions");
                 });
@@ -322,6 +457,13 @@ namespace KMG.EF.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ExtraFieldValues")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("LastUpdated")
                         .HasColumnType("datetime2");
 
@@ -344,7 +486,60 @@ namespace KMG.EF.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.ToTable("Materials");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.MaterialCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ExtraFieldDefinitions")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MaterialCategories");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.MiscExpense", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CreatedByEmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpenseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByEmployeeId");
+
+                    b.ToTable("MiscExpenses");
                 });
 
             modelBuilder.Entity("KMG.Core.Models.Mission", b =>
@@ -412,6 +607,52 @@ namespace KMG.EF.Migrations
                     b.HasIndex("MissionId");
 
                     b.ToTable("MissionWorkers");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsDismissed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LinkUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DedupeKey")
+                        .IsUnique();
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("KMG.Core.Models.PayrollAdjustment", b =>
@@ -519,6 +760,10 @@ namespace KMG.EF.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ProjectCode")
@@ -694,6 +939,39 @@ namespace KMG.EF.Migrations
                     b.ToTable("ProjectPayments");
                 });
 
+            modelBuilder.Entity("KMG.Core.Models.ProjectWriteOff", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("CreatedByEmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("WriteOffDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByEmployeeId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("ProjectWriteOffs");
+                });
+
             modelBuilder.Entity("KMG.Core.Models.RoleIdentity", b =>
                 {
                     b.Property<string>("Id")
@@ -839,8 +1117,17 @@ namespace KMG.EF.Migrations
                     b.Property<decimal>("AmountCredit")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<DateTime?>("CheckDueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CheckStatus")
+                        .HasColumnType("int");
+
                     b.Property<int>("CreatedByEmployeeId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsCheck")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
@@ -1001,6 +1288,16 @@ namespace KMG.EF.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("KMG.Core.Models.AiPromptConfig", b =>
+                {
+                    b.HasOne("KMG.Core.Models.Employee", "UpdatedByEmployee")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("UpdatedByEmployee");
+                });
+
             modelBuilder.Entity("KMG.Core.Models.CashBoxTransaction", b =>
                 {
                     b.HasOne("KMG.Core.Models.Advance", "Advance")
@@ -1019,6 +1316,11 @@ namespace KMG.EF.Migrations
                         .HasForeignKey("CreatedByEmployeeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("KMG.Core.Models.MiscExpense", "MiscExpense")
+                        .WithMany()
+                        .HasForeignKey("MiscExpenseId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("KMG.Core.Models.Mission", "Mission")
                         .WithMany("CashBoxTransactions")
@@ -1040,9 +1342,19 @@ namespace KMG.EF.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("KMG.Core.Models.ProjectPayment", "ProjectPayment")
+                        .WithMany()
+                        .HasForeignKey("ProjectPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("KMG.Core.Models.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("KMG.Core.Models.SupplierPayment", "SupplierPayment")
+                        .WithMany()
+                        .HasForeignKey("SupplierPaymentId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Advance");
@@ -1050,6 +1362,8 @@ namespace KMG.EF.Migrations
                     b.Navigation("CashBox");
 
                     b.Navigation("CreatedByEmployee");
+
+                    b.Navigation("MiscExpense");
 
                     b.Navigation("Mission");
 
@@ -1059,7 +1373,11 @@ namespace KMG.EF.Migrations
 
                     b.Navigation("ProjectExpense");
 
+                    b.Navigation("ProjectPayment");
+
                     b.Navigation("Supplier");
+
+                    b.Navigation("SupplierPayment");
                 });
 
             modelBuilder.Entity("KMG.Core.Models.Employee", b =>
@@ -1077,6 +1395,27 @@ namespace KMG.EF.Migrations
                     b.Navigation("ApplicationUser");
 
                     b.Navigation("Manager");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.Material", b =>
+                {
+                    b.HasOne("KMG.Core.Models.MaterialCategory", "Category")
+                        .WithMany("Materials")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.MiscExpense", b =>
+                {
+                    b.HasOne("KMG.Core.Models.Employee", "CreatedByEmployee")
+                        .WithMany()
+                        .HasForeignKey("CreatedByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByEmployee");
                 });
 
             modelBuilder.Entity("KMG.Core.Models.Mission", b =>
@@ -1233,6 +1572,25 @@ namespace KMG.EF.Migrations
 
                     b.HasOne("KMG.Core.Models.Project", "Project")
                         .WithMany("Payments")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByEmployee");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("KMG.Core.Models.ProjectWriteOff", b =>
+                {
+                    b.HasOne("KMG.Core.Models.Employee", "CreatedByEmployee")
+                        .WithMany()
+                        .HasForeignKey("CreatedByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KMG.Core.Models.Project", "Project")
+                        .WithMany("WriteOffs")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1423,6 +1781,11 @@ namespace KMG.EF.Migrations
                     b.Navigation("StockMovements");
                 });
 
+            modelBuilder.Entity("KMG.Core.Models.MaterialCategory", b =>
+                {
+                    b.Navigation("Materials");
+                });
+
             modelBuilder.Entity("KMG.Core.Models.Mission", b =>
                 {
                     b.Navigation("CashBoxTransactions");
@@ -1450,6 +1813,8 @@ namespace KMG.EF.Migrations
                     b.Navigation("Payments");
 
                     b.Navigation("StockMovements");
+
+                    b.Navigation("WriteOffs");
                 });
 
             modelBuilder.Entity("KMG.Core.Models.ProjectExpense", b =>

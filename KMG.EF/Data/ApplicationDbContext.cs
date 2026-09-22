@@ -1,6 +1,8 @@
+using System.Text.Json;
 using KMG.Core.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace KMG.EF.Data
 {
@@ -20,6 +22,7 @@ namespace KMG.EF.Data
         public DbSet<SupplierPayment> SupplierPayments { get; set; } = null!;
 
         public DbSet<Material> Materials { get; set; } = null!;
+        public DbSet<MaterialCategory> MaterialCategories { get; set; } = null!;
         public DbSet<StockMovement> StockMovements { get; set; } = null!;
 
         public DbSet<Project> Projects { get; set; } = null!;
@@ -27,6 +30,7 @@ namespace KMG.EF.Data
         public DbSet<ProjectExpense> ProjectExpenses { get; set; } = null!;
         public DbSet<ProjectAttachment> ProjectAttachments { get; set; } = null!;
         public DbSet<ProjectAudit> ProjectAudits { get; set; } = null!;
+        public DbSet<ProjectWriteOff> ProjectWriteOffs { get; set; } = null!;
 
         public DbSet<Mission> Missions { get; set; } = null!;
         public DbSet<MissionWorker> MissionWorkers { get; set; } = null!;
@@ -37,6 +41,11 @@ namespace KMG.EF.Data
 
         public DbSet<CashBox> CashBoxes { get; set; } = null!;
         public DbSet<CashBoxTransaction> CashBoxTransactions { get; set; } = null!;
+        public DbSet<MiscExpense> MiscExpenses { get; set; } = null!;
+
+        public DbSet<AiPromptConfig> AiPromptConfigs { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
+        public DbSet<AiTenderResult> AiTenderResults { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -108,6 +117,36 @@ namespace KMG.EF.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             // ---------- Stock ----------
+            var fieldDefinitionsComparer = new ValueComparer<List<CategoryFieldDefinition>>(
+                (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+                v => JsonSerializer.Deserialize<List<CategoryFieldDefinition>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new());
+
+            modelBuilder.Entity<MaterialCategory>()
+                .Property(c => c.ExtraFieldDefinitions)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<CategoryFieldDefinition>>(v, (JsonSerializerOptions?)null) ?? new())
+                .Metadata.SetValueComparer(fieldDefinitionsComparer);
+
+            var extraValuesComparer = new ValueComparer<Dictionary<string, string>>(
+                (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+                v => JsonSerializer.Deserialize<Dictionary<string, string>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new());
+
+            modelBuilder.Entity<Material>()
+                .Property(m => m.ExtraFieldValues)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions?)null) ?? new())
+                .Metadata.SetValueComparer(extraValuesComparer);
+
+            modelBuilder.Entity<Material>()
+                .HasOne(m => m.Category)
+                .WithMany(c => c.Materials)
+                .HasForeignKey(m => m.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<StockMovement>()
                 .HasOne(m => m.Material)
                 .WithMany(mat => mat.StockMovements)
@@ -195,6 +234,18 @@ namespace KMG.EF.Data
                 .HasOne(pa => pa.Employee)
                 .WithMany()
                 .HasForeignKey(pa => pa.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ProjectWriteOff>()
+                .HasOne(w => w.Project)
+                .WithMany(p => p.WriteOffs)
+                .HasForeignKey(w => w.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectWriteOff>()
+                .HasOne(w => w.CreatedByEmployee)
+                .WithMany()
+                .HasForeignKey(w => w.CreatedByEmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // ---------- Mission ----------
@@ -291,10 +342,48 @@ namespace KMG.EF.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<CashBoxTransaction>()
+                .HasOne(t => t.ProjectPayment)
+                .WithMany()
+                .HasForeignKey(t => t.ProjectPaymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CashBoxTransaction>()
+                .HasOne(t => t.SupplierPayment)
+                .WithMany()
+                .HasForeignKey(t => t.SupplierPaymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CashBoxTransaction>()
+                .HasOne(t => t.MiscExpense)
+                .WithMany()
+                .HasForeignKey(t => t.MiscExpenseId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MiscExpense>()
+                .HasOne(m => m.CreatedByEmployee)
+                .WithMany()
+                .HasForeignKey(m => m.CreatedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CashBoxTransaction>()
                 .HasOne(t => t.CreatedByEmployee)
                 .WithMany()
                 .HasForeignKey(t => t.CreatedByEmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AiPromptConfig>()
+                .HasOne(a => a.UpdatedByEmployee)
+                .WithMany()
+                .HasForeignKey(a => a.UpdatedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(n => n.DedupeKey)
+                .IsUnique();
+
+            modelBuilder.Entity<AiTenderResult>()
+                .HasIndex(t => t.TenderId)
+                .IsUnique();
         }
     }
 }

@@ -22,6 +22,7 @@ namespace KMG.Core.DTOs.Client
     public class ClientProjectSummaryDTO
     {
         public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string ProjectCode { get; set; } = string.Empty;
         public string ProjectType { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;

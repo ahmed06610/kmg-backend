@@ -1,3 +1,5 @@
+using KMG.Core.Enums;
+
 namespace KMG.Core.DTOs.Supplier
 {
     public class SupplierListDTO
@@ -22,11 +24,16 @@ namespace KMG.Core.DTOs.Supplier
     public class SupplierPaymentDTO
     {
         public int Id { get; set; }
+        public int SupplierId { get; set; }
+        public string? SupplierName { get; set; }
         public decimal Amount { get; set; }
         public decimal AmountCash { get; set; }
         public decimal AmountCredit { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? Notes { get; set; }
+        public bool IsCheck { get; set; }
+        public DateTime? CheckDueDate { get; set; }
+        public string? CheckStatus { get; set; }
     }
 
     public class SupplierPurchaseDTO
@@ -58,5 +65,25 @@ namespace KMG.Core.DTOs.Supplier
         public decimal AmountCredit { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? Notes { get; set; }
+        public bool IsCheck { get; set; }
+        public DateTime? CheckDueDate { get; set; }
+    }
+
+    public class UpdateSupplierPaymentDTO
+    {
+        public int Id { get; set; }
+        public decimal AmountCash { get; set; }
+        public decimal AmountCredit { get; set; }
+        public DateTime PaymentDate { get; set; }
+        public string? Notes { get; set; }
+        public bool IsCheck { get; set; }
+        public DateTime? CheckDueDate { get; set; }
+    }
+
+    public class ResolveCheckDTO
+    {
+        public int PaymentId { get; set; }
+        public CheckResolutionAction Action { get; set; }
+        public DateTime? NewDueDate { get; set; }
     }
 }

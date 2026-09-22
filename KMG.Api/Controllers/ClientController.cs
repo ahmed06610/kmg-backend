@@ -46,5 +46,20 @@ namespace KMG.Api.Controllers
             var result = await _clientService.UpdateAsync(model);
             return result ? Ok() : NotFound();
         }
+
+        [HttpDelete("{id}")]
+        [AuthorizeAbility("إدارة العملاء")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                var result = await _clientService.DeleteAsync(id);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

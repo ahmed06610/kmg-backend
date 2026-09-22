@@ -8,5 +8,6 @@ namespace KMG.Core.Interfaces.Services
         Task<ClientDetailsDTO?> GetByIdAsync(int id);
         Task<int> CreateAsync(CreateClientDTO model);
         Task<bool> UpdateAsync(UpdateClientDTO model);
+        Task<bool> DeleteAsync(int id);
     }
 }

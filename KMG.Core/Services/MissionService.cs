@@ -203,11 +203,111 @@ namespace KMG.Core.Services
             }
         }
 
+        public async Task<MissionDetailsDTO> UpdateAsync(UpdateMissionDTO model, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var mission = await _unitOfWork.Mission.GetQueryable(m => m.Id == model.MissionId)
+                    .Include(m => m.Project)
+                    .FirstOrDefaultAsync() ?? throw new Exception("المأمورية غير موجودة");
+
+                if (mission.Status != MissionStatus.Open)
+                    throw new Exception("لا يمكن تعديل مأمورية متسواة بالفعل");
+
+                if (mission.AdvanceAmount != model.AdvanceAmount)
+                {
+                    await _cashBoxService.ReverseAsync(t => t.MissionId == mission.Id);
+                    if (model.AdvanceAmount > 0)
+                    {
+                        await _cashBoxService.RecordTransactionAsync(
+                            amountCash: -model.AdvanceAmount,
+                            amountCredit: 0,
+                            type: TransactionType.MissionAdvanceOut,
+                            description: $"تعديل عهدة مأمورية لمشروع {mission.Project.ProjectCode}",
+                            createdByEmployeeId: employeeId,
+                            projectId: mission.ProjectId,
+                            missionId: mission.Id);
+                    }
+                }
+
+                mission.ForemanEmployeeId = model.ForemanEmployeeId;
+                mission.StartDate = model.StartDate;
+                mission.AdvanceAmount = model.AdvanceAmount;
+                mission.Notes = model.Notes;
+                _unitOfWork.Mission.Update(mission);
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = mission.ProjectId,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = $"تعديل بيانات مأمورية (العهدة أصبحت {model.AdvanceAmount})"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return (await GetByIdAsync(mission.Id))!;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteAsync(int id, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var mission = await _unitOfWork.Mission.GetByIdAsync(id);
+                if (mission == null) return false;
+
+                // فرق تسوية العهدة (لو اتسوت) كان بيتسجل كـ ProjectExpense مربوط بنفس حركات الخزنة دي
+                var relatedExpenseIds = await _unitOfWork.CashBoxTransaction
+                    .GetQueryable(t => t.MissionId == id && t.ProjectExpenseId != null)
+                    .Select(t => t.ProjectExpenseId!.Value)
+                    .Distinct()
+                    .ToListAsync();
+
+                await _cashBoxService.ReverseAsync(t => t.MissionId == id);
+
+                if (relatedExpenseIds.Count > 0)
+                {
+                    var expenses = await _unitOfWork.ProjectExpense.GetQueryable(e => relatedExpenseIds.Contains(e.Id)).ToListAsync();
+                    _unitOfWork.ProjectExpense.DeleteRange(expenses);
+                }
+
+                var projectId = mission.ProjectId;
+                _unitOfWork.Mission.Delete(mission); // بيمسح MissionWorkers تلقائيًا (Cascade)
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = projectId,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = "حذف مأمورية"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
         private static MissionListDTO MapList(Mission m) => new()
         {
             Id = m.Id,
             ProjectId = m.ProjectId,
             ProjectCode = m.Project.ProjectCode,
+            ForemanEmployeeId = m.ForemanEmployeeId,
             ForemanName = m.ForemanEmployee.Name,
             StartDate = m.StartDate,
             EndDate = m.EndDate,

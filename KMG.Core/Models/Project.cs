@@ -6,6 +6,7 @@ namespace KMG.Core.Models
     public class Project
     {
         public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string ProjectCode { get; set; } = string.Empty;
         public ProjectType ProjectType { get; set; }
         public ProjectStatus Status { get; set; }
@@ -34,6 +35,7 @@ namespace KMG.Core.Models
         public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
         public virtual ICollection<ProjectAttachment> Attachments { get; set; } = new List<ProjectAttachment>();
         public virtual ICollection<ProjectAudit> AuditLogs { get; set; } = new List<ProjectAudit>();
+        public virtual ICollection<ProjectWriteOff> WriteOffs { get; set; } = new List<ProjectWriteOff>();
         public virtual ICollection<CashBoxTransaction> CashBoxTransactions { get; set; } = new List<CashBoxTransaction>();
 
         // تكلفة الخامات = (صرف للمشروع - مرتجع من المشروع) بسعر وقت الحركة
@@ -52,7 +54,10 @@ namespace KMG.Core.Models
         public decimal TotalCollected => Payments.Sum(p => p.Amount);
 
         [NotMapped]
-        public decimal RemainingBalance => ContractValue - TotalCollected;
+        public decimal TotalWriteOffs => WriteOffs.Sum(w => w.Amount);
+
+        [NotMapped]
+        public decimal RemainingBalance => ContractValue - TotalCollected - TotalWriteOffs;
 
         [NotMapped]
         public decimal NetProfit => ContractValue - (TotalMaterialsCost + TotalPettyExpenses + TotalLaborCost);

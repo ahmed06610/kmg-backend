@@ -34,6 +34,15 @@ namespace KMG.Core.Models
         public int? AdvanceId { get; set; }
         public virtual Advance? Advance { get; set; }
 
+        public int? ProjectPaymentId { get; set; }
+        public virtual ProjectPayment? ProjectPayment { get; set; }
+
+        public int? SupplierPaymentId { get; set; }
+        public virtual SupplierPayment? SupplierPayment { get; set; }
+
+        public int? MiscExpenseId { get; set; }
+        public virtual MiscExpense? MiscExpense { get; set; }
+
         public int CreatedByEmployeeId { get; set; }
         public virtual Employee CreatedByEmployee { get; set; } = null!;
     }

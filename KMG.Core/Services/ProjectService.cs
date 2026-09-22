@@ -25,6 +25,7 @@ namespace KMG.Core.Services
                  .Include(p => p.Payments)
                  .Include(p => p.Expenses)
                  .Include(p => p.StockMovements)
+                 .Include(p => p.WriteOffs)
                  .Include(p => p.Missions).ThenInclude(m => m.MissionWorkers).ThenInclude(w => w.Employee);
 
         public async Task<List<ProjectListDTO>> GetAllAsync()
@@ -56,6 +57,7 @@ namespace KMG.Core.Services
             return new ProjectDetailsDTO
             {
                 Id = list.Id,
+                Name = list.Name,
                 ProjectCode = list.ProjectCode,
                 ProjectType = list.ProjectType,
                 Status = list.Status,
@@ -76,6 +78,7 @@ namespace KMG.Core.Services
                 TotalMaterialsCost = project.TotalMaterialsCost,
                 TotalPettyExpenses = project.TotalPettyExpenses,
                 TotalLaborCost = project.TotalLaborCost,
+                TotalWriteOffs = project.TotalWriteOffs,
                 Payments = project.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new ProjectPaymentDTO
                 {
                     Id = p.Id,
@@ -123,7 +126,16 @@ namespace KMG.Core.Services
                     ActionDescription = a.ActionDescription,
                     ActionDate = a.ActionDate,
                     EmployeeName = a.Employee.Name
-                }).ToList()
+                }).ToList(),
+                WriteOffs = project.WriteOffs.OrderByDescending(w => w.WriteOffDate).Select(w => new ProjectWriteOffDTO
+                {
+                    Id = w.Id,
+                    Amount = w.Amount,
+                    Reason = w.Reason,
+                    WriteOffDate = w.WriteOffDate
+                }).ToList(),
+                CanDelete = !project.Payments.Any() && !project.Expenses.Any() && !project.Missions.Any()
+                    && !project.StockMovements.Any() && !project.Attachments.Any() && !project.WriteOffs.Any()
             };
         }
 
@@ -136,6 +148,7 @@ namespace KMG.Core.Services
 
                 var project = new Project
                 {
+                    Name = model.Name,
                     ProjectCode = projectCode,
                     ProjectType = model.ProjectType,
                     Status = ProjectStatus.New,
@@ -205,6 +218,51 @@ namespace KMG.Core.Services
                 projectExpenseId: expense.Id);
         }
 
+        public async Task<bool> UpdateAsync(UpdateProjectDTO model, int employeeId)
+        {
+            var project = await _unitOfWork.Project.GetByIdAsync(model.Id);
+            if (project == null) return false;
+
+            project.Name = model.Name;
+            project.Description = model.Description;
+            project.ClientId = model.ClientId;
+            project.ContractValue = model.ContractValue;
+            _unitOfWork.Project.Update(project);
+
+            await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+            {
+                ProjectId = project.Id,
+                EmployeeId = employeeId,
+                ActionDate = TimeHelper.NowInEgypt,
+                ActionDescription = "تم تعديل بيانات المشروع"
+            });
+
+            await _unitOfWork.CompleteAsync();
+            return true;
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var project = await _unitOfWork.Project.GetQueryable(p => p.Id == id)
+                .Include(p => p.Payments)
+                .Include(p => p.Expenses)
+                .Include(p => p.Missions)
+                .Include(p => p.StockMovements)
+                .Include(p => p.Attachments)
+                .Include(p => p.WriteOffs)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync();
+            if (project == null) return false;
+
+            if (project.Payments.Any() || project.Expenses.Any() || project.Missions.Any()
+                || project.StockMovements.Any() || project.Attachments.Any() || project.WriteOffs.Any())
+                throw new Exception("لا يمكن حذف مشروع له بيانات مسجلة (دفعات/مصاريف/مأموريات/حركات مخزون/مرفقات/خصومات أعمال) - احذفها أولًا");
+
+            _unitOfWork.Project.Delete(project);
+            await _unitOfWork.CompleteAsync();
+            return true;
+        }
+
         public async Task<bool> UpdateStatusAsync(UpdateProjectStatusDTO model, int employeeId)
         {
             var project = await _unitOfWork.Project.GetByIdAsync(model.ProjectId);
@@ -218,7 +276,7 @@ namespace KMG.Core.Services
                 ProjectId = project.Id,
                 EmployeeId = employeeId,
                 ActionDate = TimeHelper.NowInEgypt,
-                ActionDescription = $"تم تغيير حالة المشروع إلى: {model.Status}"
+                ActionDescription = $"تم تغيير حالة المشروع إلى: {model.Status.Arabic()}"
             });
 
             await _unitOfWork.CompleteAsync();
@@ -255,6 +313,7 @@ namespace KMG.Core.Services
                 };
 
                 await _unitOfWork.ProjectPayment.AddAsync(payment);
+                await _unitOfWork.CompleteAsync(); // نحتاج payment.Id عشان نربط بيه حركة الخزنة
 
                 await _cashBoxService.RecordTransactionAsync(
                     amountCash: model.AmountCash,
@@ -262,7 +321,8 @@ namespace KMG.Core.Services
                     type: TransactionType.ProjectPaymentIn,
                     description: $"تحصيل دفعة من مشروع: {project.ProjectCode}",
                     createdByEmployeeId: createdByEmployeeId,
-                    projectId: model.ProjectId);
+                    projectId: model.ProjectId,
+                    projectPaymentId: payment.Id);
 
                 await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
                 {
@@ -284,6 +344,104 @@ namespace KMG.Core.Services
                     PaymentDate = payment.PaymentDate,
                     Notes = payment.Notes
                 };
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<ProjectPaymentDTO> UpdatePaymentAsync(UpdateProjectPaymentDTO model, int employeeId)
+        {
+            if (model.AmountCash < 0 || model.AmountCredit < 0)
+                throw new Exception("لا يمكن أن تكون قيمة الكاش أو الكريديت سالبة");
+            var newAmount = model.AmountCash + model.AmountCredit;
+            if (newAmount <= 0)
+                throw new Exception("قيمة الدفعة يجب أن تكون أكبر من صفر");
+
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var payment = await _unitOfWork.ProjectPayment.GetQueryable(p => p.Id == model.Id)
+                    .Include(p => p.Project).ThenInclude(pr => pr.Payments)
+                    .FirstOrDefaultAsync() ?? throw new Exception("الدفعة غير موجودة");
+
+                var project = payment.Project;
+                var otherPaymentsTotal = project.Payments.Where(p => p.Id != payment.Id).Sum(p => p.Amount);
+                if (otherPaymentsTotal + newAmount > project.ContractValue)
+                    throw new Exception($"قيمة الدفعة أكبر من المتبقي على المشروع (المتبقي: {project.ContractValue - otherPaymentsTotal})");
+
+                await _cashBoxService.ReverseAsync(t => t.ProjectPaymentId == payment.Id);
+
+                payment.AmountCash = model.AmountCash;
+                payment.AmountCredit = model.AmountCredit;
+                payment.Amount = newAmount;
+                payment.PaymentDate = model.PaymentDate;
+                payment.Notes = model.Notes;
+                _unitOfWork.ProjectPayment.Update(payment);
+
+                await _cashBoxService.RecordTransactionAsync(
+                    amountCash: payment.AmountCash,
+                    amountCredit: payment.AmountCredit,
+                    type: TransactionType.ProjectPaymentIn,
+                    description: $"تعديل دفعة من مشروع: {project.ProjectCode}",
+                    createdByEmployeeId: employeeId,
+                    projectId: project.Id,
+                    projectPaymentId: payment.Id);
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = project.Id,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = $"تعديل دفعة لتصبح بقيمة {payment.Amount}"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return new ProjectPaymentDTO
+                {
+                    Id = payment.Id,
+                    Amount = payment.Amount,
+                    AmountCash = payment.AmountCash,
+                    AmountCredit = payment.AmountCredit,
+                    PaymentDate = payment.PaymentDate,
+                    Notes = payment.Notes
+                };
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<bool> DeletePaymentAsync(int id, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var payment = await _unitOfWork.ProjectPayment.GetQueryable(p => p.Id == id)
+                    .Include(p => p.Project)
+                    .FirstOrDefaultAsync();
+                if (payment == null) return false;
+
+                await _cashBoxService.ReverseAsync(t => t.ProjectPaymentId == id);
+                _unitOfWork.ProjectPayment.Delete(payment);
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = payment.ProjectId,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = $"حذف دفعة كانت بقيمة {payment.Amount}"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+                return true;
             }
             catch
             {
@@ -331,7 +489,7 @@ namespace KMG.Core.Services
                     ProjectId = model.ProjectId,
                     EmployeeId = createdByEmployeeId,
                     ActionDate = TimeHelper.NowInEgypt,
-                    ActionDescription = $"تسجيل مصروف نثري بقيمة {model.Amount} ({model.Category})"
+                    ActionDescription = $"تسجيل مصروف نثري بقيمة {model.Amount} ({model.Category.Arabic()})"
                 });
 
                 await _unitOfWork.CompleteAsync();
@@ -346,6 +504,95 @@ namespace KMG.Core.Services
                     ExpenseDate = expense.ExpenseDate,
                     AttachmentUrl = expense.AttachmentUrl
                 };
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<ProjectExpenseDTO> UpdateExpenseAsync(UpdateProjectExpenseDTO model, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var expense = await _unitOfWork.ProjectExpense.GetQueryable(e => e.Id == model.Id)
+                    .Include(e => e.Project)
+                    .FirstOrDefaultAsync() ?? throw new Exception("المصروف غير موجود");
+
+                var hadCashBoxEffect = (await _unitOfWork.CashBoxTransaction.GetQueryable(t => t.ProjectExpenseId == expense.Id).AnyAsync());
+                if (hadCashBoxEffect)
+                    await _cashBoxService.ReverseAsync(t => t.ProjectExpenseId == expense.Id);
+
+                expense.Amount = model.Amount;
+                expense.Category = model.Category;
+                expense.Description = model.Description;
+                expense.ExpenseDate = model.ExpenseDate;
+                _unitOfWork.ProjectExpense.Update(expense);
+
+                if (hadCashBoxEffect)
+                {
+                    await _cashBoxService.RecordTransactionAsync(
+                        amountCash: -model.Amount,
+                        amountCredit: 0,
+                        type: TransactionType.ProjectExpenseOut,
+                        description: $"تعديل مصروف نثري لمشروع {expense.Project.ProjectCode}: {model.Description}",
+                        createdByEmployeeId: employeeId,
+                        projectId: expense.ProjectId,
+                        projectExpenseId: expense.Id);
+                }
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = expense.ProjectId,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = $"تعديل مصروف نثري ليصبح بقيمة {model.Amount}"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return new ProjectExpenseDTO
+                {
+                    Id = expense.Id,
+                    Amount = expense.Amount,
+                    Category = expense.Category.ToString(),
+                    Description = expense.Description,
+                    ExpenseDate = expense.ExpenseDate,
+                    AttachmentUrl = expense.AttachmentUrl
+                };
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteExpenseAsync(int id, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var expense = await _unitOfWork.ProjectExpense.GetByIdAsync(id);
+                if (expense == null) return false;
+
+                await _cashBoxService.ReverseAsync(t => t.ProjectExpenseId == id);
+                _unitOfWork.ProjectExpense.Delete(expense);
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = expense.ProjectId,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = $"حذف مصروف نثري كان بقيمة {expense.Amount}"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+                return true;
             }
             catch
             {
@@ -383,6 +630,117 @@ namespace KMG.Core.Services
             };
         }
 
+        public async Task<bool> UpdateAttachmentAsync(UpdateProjectAttachmentDTO model)
+        {
+            var attachment = await _unitOfWork.ProjectAttachment.GetByIdAsync(model.Id);
+            if (attachment == null) return false;
+
+            attachment.Description = model.Description;
+            _unitOfWork.ProjectAttachment.Update(attachment);
+            await _unitOfWork.CompleteAsync();
+            return true;
+        }
+
+        /// <returns>رابط الملف المحذوف عشان الـ Controller يقدر يمسحه فعليًا من التخزين، أو null لو المرفق مش موجود</returns>
+        public async Task<string?> DeleteAttachmentAsync(int id)
+        {
+            var attachment = await _unitOfWork.ProjectAttachment.GetByIdAsync(id);
+            if (attachment == null) return null;
+
+            _unitOfWork.ProjectAttachment.Delete(attachment);
+            await _unitOfWork.CompleteAsync();
+            return attachment.FileUrl;
+        }
+
+        public async Task<ProjectWriteOffDTO> CreateWriteOffAsync(CreateProjectWriteOffDTO model, int employeeId)
+        {
+            if (model.Amount <= 0)
+                throw new Exception("قيمة الخصم يجب أن تكون أكبر من صفر");
+
+            var project = await _unitOfWork.Project.GetQueryable(p => p.Id == model.ProjectId)
+                .Include(p => p.Payments)
+                .Include(p => p.WriteOffs)
+                .FirstOrDefaultAsync() ?? throw new Exception("المشروع غير موجود");
+
+            if (model.Amount > project.RemainingBalance)
+                throw new Exception($"قيمة الخصم أكبر من المتبقي على المشروع (المتبقي: {project.RemainingBalance})");
+
+            var writeOff = new ProjectWriteOff
+            {
+                ProjectId = model.ProjectId,
+                Amount = model.Amount,
+                Reason = model.Reason,
+                WriteOffDate = model.WriteOffDate,
+                CreatedByEmployeeId = employeeId
+            };
+
+            await _unitOfWork.ProjectWriteOff.AddAsync(writeOff);
+
+            await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+            {
+                ProjectId = model.ProjectId,
+                EmployeeId = employeeId,
+                ActionDate = TimeHelper.NowInEgypt,
+                ActionDescription = $"تسجيل خصم أعمال بقيمة {model.Amount}: {model.Reason}"
+            });
+
+            await _unitOfWork.CompleteAsync();
+
+            return new ProjectWriteOffDTO { Id = writeOff.Id, Amount = writeOff.Amount, Reason = writeOff.Reason, WriteOffDate = writeOff.WriteOffDate };
+        }
+
+        public async Task<ProjectWriteOffDTO> UpdateWriteOffAsync(UpdateProjectWriteOffDTO model, int employeeId)
+        {
+            if (model.Amount <= 0)
+                throw new Exception("قيمة الخصم يجب أن تكون أكبر من صفر");
+
+            var writeOff = await _unitOfWork.ProjectWriteOff.GetQueryable(w => w.Id == model.Id)
+                .Include(w => w.Project).ThenInclude(p => p.Payments)
+                .Include(w => w.Project).ThenInclude(p => p.WriteOffs)
+                .FirstOrDefaultAsync() ?? throw new Exception("خصم الأعمال غير موجود");
+
+            var otherWriteOffsTotal = writeOff.Project.WriteOffs.Where(w => w.Id != writeOff.Id).Sum(w => w.Amount);
+            var remainingExcludingThis = writeOff.Project.ContractValue - writeOff.Project.TotalCollected - otherWriteOffsTotal;
+            if (model.Amount > remainingExcludingThis)
+                throw new Exception($"قيمة الخصم أكبر من المتبقي على المشروع (المتبقي: {remainingExcludingThis})");
+
+            writeOff.Amount = model.Amount;
+            writeOff.Reason = model.Reason;
+            writeOff.WriteOffDate = model.WriteOffDate;
+            _unitOfWork.ProjectWriteOff.Update(writeOff);
+
+            await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+            {
+                ProjectId = writeOff.ProjectId,
+                EmployeeId = employeeId,
+                ActionDate = TimeHelper.NowInEgypt,
+                ActionDescription = $"تعديل خصم أعمال ليصبح بقيمة {model.Amount}"
+            });
+
+            await _unitOfWork.CompleteAsync();
+
+            return new ProjectWriteOffDTO { Id = writeOff.Id, Amount = writeOff.Amount, Reason = writeOff.Reason, WriteOffDate = writeOff.WriteOffDate };
+        }
+
+        public async Task<bool> DeleteWriteOffAsync(int id, int employeeId)
+        {
+            var writeOff = await _unitOfWork.ProjectWriteOff.GetByIdAsync(id);
+            if (writeOff == null) return false;
+
+            _unitOfWork.ProjectWriteOff.Delete(writeOff);
+
+            await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+            {
+                ProjectId = writeOff.ProjectId,
+                EmployeeId = employeeId,
+                ActionDate = TimeHelper.NowInEgypt,
+                ActionDescription = $"حذف خصم أعمال كان بقيمة {writeOff.Amount}"
+            });
+
+            await _unitOfWork.CompleteAsync();
+            return true;
+        }
+
         private async Task<string> GenerateProjectCodeAsync()
         {
             var year = TimeHelper.NowInEgypt.Year;
@@ -393,6 +751,7 @@ namespace KMG.Core.Services
         private static ProjectListDTO MapList(Project p) => new()
         {
             Id = p.Id,
+            Name = p.Name,
             ProjectCode = p.ProjectCode,
             ProjectType = p.ProjectType.ToString(),
             Status = p.Status.ToString(),

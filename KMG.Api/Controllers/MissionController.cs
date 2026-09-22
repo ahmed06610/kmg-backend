@@ -61,5 +61,34 @@ namespace KMG.Api.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpPut]
+        [AuthorizeAbility("إدارة المأموريات")]
+        public async Task<IActionResult> Update([FromBody] UpdateMissionDTO model)
+        {
+            try
+            {
+                return Ok(await _missionService.UpdateAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("{id}")]
+        [AuthorizeAbility("إدارة المأموريات")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                var result = await _missionService.DeleteAsync(id, CurrentEmployeeId);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

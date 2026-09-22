@@ -102,6 +102,7 @@ namespace KMG.Api.Helper
             // ==================== مشروع 1: تصنيع وتنفيذ (مناقصة) ====================
             var project1Id = await projectService.CreateAsync(new CreateProjectDTO
             {
+                Name = "واجهة كلادينج - فرع جديد",
                 ProjectType = ProjectType.ManufactureExecution,
                 ClientId = client1Id,
                 ContractValue = 500000,
@@ -143,6 +144,7 @@ namespace KMG.Api.Helper
             // ==================== مشروع 2: مقاولات من الباطن (تعامل مباشر) ====================
             var project2Id = await projectService.CreateAsync(new CreateProjectDTO
             {
+                Name = "لافتة محطة وقود + كلادينج المدخل",
                 ProjectType = ProjectType.Subcontracting,
                 ClientId = client2Id,
                 ContractValue = 120000,
@@ -176,6 +178,7 @@ namespace KMG.Api.Helper
             // ==================== مشروع 3: توريد خامات ====================
             var project3Id = await projectService.CreateAsync(new CreateProjectDTO
             {
+                Name = "توريد لوحات معدنية جاهزة",
                 ProjectType = ProjectType.Supply,
                 ClientId = client3Id,
                 ContractValue = 52000,

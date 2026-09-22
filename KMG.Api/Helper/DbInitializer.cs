@@ -23,7 +23,8 @@ namespace KMG.Api.Helper
             "إدارة المأموريات",
             "إدارة الرواتب",
             "عرض الخزنة",
-            "عرض لوحة التحكم"
+            "عرض لوحة التحكم",
+            "إدارة تكامل AI"
         };
 
         public static async Task SeedAsync(IServiceProvider services)
@@ -37,6 +38,40 @@ namespace KMG.Api.Helper
             await SeedAbilitiesAsync(context);
             await SeedRoleAbilitiesAsync(context, roleManager);
             await SeedOwnerAsync(context, userManager, roleManager, unitOfWork);
+            await SyncOwnerAbilitiesAsync(context, userManager, roleManager);
+        }
+
+        // الـ JWT بياخد صلاحيات المستخدم من UserAbilities المباشرة بس (مش من الدور)،
+        // فأي صلاحية جديدة تتضاف للنظام بعد ما يكون صاحب العمل متسجل بالفعل محتاجة
+        // تتزامن يدويًا كده على كل تشغيل، وإلا هتفضل شغالة في الباك اند (السماحية بتتفحص
+        // من الدور برضه) بس متختفيش من الواجهة لحد ما تتزامن هنا
+        private static async Task SyncOwnerAbilitiesAsync(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            RoleManager<RoleIdentity> roleManager)
+        {
+            var ownerRole = await roleManager.FindByNameAsync(OwnerRole);
+            if (ownerRole == null) return;
+
+            var roleAbilityIds = await context.RolesAbilities
+                .Where(ra => ra.RoleId == ownerRole.Id)
+                .Select(ra => ra.AbilityId)
+                .ToListAsync();
+
+            var ownerUsers = await userManager.GetUsersInRoleAsync(OwnerRole);
+            foreach (var user in ownerUsers)
+            {
+                var existingAbilityIds = await context.UserAbilities
+                    .Where(ua => ua.UserId == user.Id)
+                    .Select(ua => ua.AbilityId)
+                    .ToListAsync();
+
+                var missingAbilityIds = roleAbilityIds.Except(existingAbilityIds);
+                foreach (var abilityId in missingAbilityIds)
+                    context.UserAbilities.Add(new UserAbility { UserId = user.Id, AbilityId = abilityId });
+            }
+
+            await context.SaveChangesAsync();
         }
 
         private static async Task SeedRolesAsync(RoleManager<RoleIdentity> roleManager)
@@ -85,8 +120,8 @@ namespace KMG.Api.Helper
             // صاحب العمل: كل الصلاحيات
             await AssignAsync(OwnerRole, AllAbilities);
 
-            // المحاسب: كل حاجة ما عدا إدارة حسابات الموظفين نفسها
-            await AssignAsync(AccountantRole, AllAbilities.Where(a => a != "إدارة الموظفين"));
+            // المحاسب: كل حاجة ما عدا إدارة حسابات الموظفين نفسها وتكامل الـ AI
+            await AssignAsync(AccountantRole, AllAbilities.Where(a => a != "إدارة الموظفين" && a != "إدارة تكامل AI"));
         }
 
         private static async Task SeedOwnerAsync(

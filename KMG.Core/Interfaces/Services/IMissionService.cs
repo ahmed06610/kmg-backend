@@ -8,5 +8,7 @@ namespace KMG.Core.Interfaces.Services
         Task<MissionDetailsDTO?> GetByIdAsync(int id);
         Task<int> CreateAsync(CreateMissionDTO model, int createdByEmployeeId);
         Task<MissionDetailsDTO> SettleAsync(SettleMissionDTO model, int settledByEmployeeId);
+        Task<MissionDetailsDTO> UpdateAsync(UpdateMissionDTO model, int employeeId);
+        Task<bool> DeleteAsync(int id, int employeeId);
     }
 }

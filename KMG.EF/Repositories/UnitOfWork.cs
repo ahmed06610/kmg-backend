@@ -21,6 +21,7 @@ namespace KMG.EF.Repositories
         public ISupplierPaymentRepository SupplierPayment { get; }
 
         public IMaterialRepository Material { get; }
+        public IMaterialCategoryRepository MaterialCategory { get; }
         public IStockMovementRepository StockMovement { get; }
 
         public IProjectRepository Project { get; }
@@ -28,6 +29,7 @@ namespace KMG.EF.Repositories
         public IProjectExpenseRepository ProjectExpense { get; }
         public IProjectAttachmentRepository ProjectAttachment { get; }
         public IProjectAuditRepository ProjectAudit { get; }
+        public IProjectWriteOffRepository ProjectWriteOff { get; }
 
         public IMissionRepository Mission { get; }
         public IMissionWorkerRepository MissionWorker { get; }
@@ -38,6 +40,11 @@ namespace KMG.EF.Repositories
 
         public ICashBoxRepository CashBox { get; }
         public ICashBoxTransactionRepository CashBoxTransaction { get; }
+        public IMiscExpenseRepository MiscExpense { get; }
+
+        public IAiPromptConfigRepository AiPromptConfig { get; }
+        public INotificationRepository Notification { get; }
+        public IAiTenderResultRepository AiTenderResult { get; }
 
         public UnitOfWork(ApplicationDbContext context)
         {
@@ -55,6 +62,7 @@ namespace KMG.EF.Repositories
             SupplierPayment = new SupplierPaymentRepository(context);
 
             Material = new MaterialRepository(context);
+            MaterialCategory = new MaterialCategoryRepository(context);
             StockMovement = new StockMovementRepository(context);
 
             Project = new ProjectRepository(context);
@@ -62,6 +70,7 @@ namespace KMG.EF.Repositories
             ProjectExpense = new ProjectExpenseRepository(context);
             ProjectAttachment = new ProjectAttachmentRepository(context);
             ProjectAudit = new ProjectAuditRepository(context);
+            ProjectWriteOff = new ProjectWriteOffRepository(context);
 
             Mission = new MissionRepository(context);
             MissionWorker = new MissionWorkerRepository(context);
@@ -72,6 +81,11 @@ namespace KMG.EF.Repositories
 
             CashBox = new CashBoxRepository(context);
             CashBoxTransaction = new CashBoxTransactionRepository(context);
+            MiscExpense = new MiscExpenseRepository(context);
+
+            AiPromptConfig = new AiPromptConfigRepository(context);
+            Notification = new NotificationRepository(context);
+            AiTenderResult = new AiTenderResultRepository(context);
         }
 
         public async Task<IDbContextTransaction> BeginTransactionAsync()

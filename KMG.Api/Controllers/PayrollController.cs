@@ -40,6 +40,35 @@ namespace KMG.Api.Controllers
             }
         }
 
+        [HttpPut("advances")]
+        [AuthorizeAbility("إدارة الرواتب")]
+        public async Task<IActionResult> UpdateAdvance([FromBody] UpdateAdvanceDTO model)
+        {
+            try
+            {
+                return Ok(await _payrollService.UpdateAdvanceAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("advances/{id}")]
+        [AuthorizeAbility("إدارة الرواتب")]
+        public async Task<IActionResult> DeleteAdvance(int id)
+        {
+            try
+            {
+                var result = await _payrollService.DeleteAdvanceAsync(id);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("adjustments")]
         [AuthorizeAbility("إدارة الرواتب")]
         public async Task<IActionResult> GetAdjustments([FromQuery] int? employeeId)
@@ -52,6 +81,35 @@ namespace KMG.Api.Controllers
         public async Task<IActionResult> CreateAdjustment([FromBody] CreateAdjustmentDTO model)
         {
             return Ok(await _payrollService.CreateAdjustmentAsync(model));
+        }
+
+        [HttpPut("adjustments")]
+        [AuthorizeAbility("إدارة الرواتب")]
+        public async Task<IActionResult> UpdateAdjustment([FromBody] UpdateAdjustmentDTO model)
+        {
+            try
+            {
+                return Ok(await _payrollService.UpdateAdjustmentAsync(model));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("adjustments/{id}")]
+        [AuthorizeAbility("إدارة الرواتب")]
+        public async Task<IActionResult> DeleteAdjustment(int id)
+        {
+            try
+            {
+                var result = await _payrollService.DeleteAdjustmentAsync(id);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPost("preview")]

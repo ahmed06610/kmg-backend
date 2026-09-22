@@ -23,6 +23,14 @@ namespace KMG.Core.DTOs.Payroll
         public string? Notes { get; set; }
     }
 
+    public class UpdateAdvanceDTO
+    {
+        public int Id { get; set; }
+        public decimal TotalAmount { get; set; }
+        public decimal InstallmentAmount { get; set; }
+        public string? Notes { get; set; }
+    }
+
     public class PayrollAdjustmentDTO
     {
         public int Id { get; set; }
@@ -38,6 +46,15 @@ namespace KMG.Core.DTOs.Payroll
     public class CreateAdjustmentDTO
     {
         public int EmployeeId { get; set; }
+        public AdjustmentType Type { get; set; }
+        public decimal Amount { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+    }
+
+    public class UpdateAdjustmentDTO
+    {
+        public int Id { get; set; }
         public AdjustmentType Type { get; set; }
         public decimal Amount { get; set; }
         public string Reason { get; set; } = string.Empty;

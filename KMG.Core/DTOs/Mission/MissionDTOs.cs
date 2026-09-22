@@ -5,6 +5,7 @@ namespace KMG.Core.DTOs.Mission
         public int Id { get; set; }
         public int ProjectId { get; set; }
         public string ProjectCode { get; set; } = string.Empty;
+        public int ForemanEmployeeId { get; set; }
         public string ForemanName { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime? EndDate { get; set; }
@@ -49,6 +50,15 @@ namespace KMG.Core.DTOs.Mission
         public int MissionId { get; set; }
         public DateTime EndDate { get; set; }
         public decimal ActualSpent { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    public class UpdateMissionDTO
+    {
+        public int MissionId { get; set; }
+        public int ForemanEmployeeId { get; set; }
+        public DateTime StartDate { get; set; }
+        public decimal AdvanceAmount { get; set; }
         public string? Notes { get; set; }
     }
 }
