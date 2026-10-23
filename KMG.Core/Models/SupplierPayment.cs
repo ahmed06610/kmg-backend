@@ -10,6 +10,8 @@ namespace KMG.Core.Models
         public decimal AmountCredit { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
 
         // دفعة بشيك: بتتحسب فورًا كمديونية متسددة على المورد، لكن أثرها في الخزنة بيتأجل
         // لحد ما يتأكد إن الشيك اتصرف فعليًا (شوف SupplierService.ResolveCheckAsync)

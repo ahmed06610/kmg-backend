@@ -23,7 +23,7 @@ namespace KMG.Core.Services
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<DashboardDTO> GetDashboardAsync()
+        public async Task<DashboardDTO> GetDashboardAsync(DateTime? from = null, DateTime? to = null)
         {
             // AsSplitQuery() لتفادي انفجار عدد الصفوف من ضرب الكولكشنز في بعض (نفس مشكلة ProjectService)
             var projects = await _unitOfWork.Project.GetQueryable(null)
@@ -31,13 +31,44 @@ namespace KMG.Core.Services
                 .Include(p => p.Payments)
                 .Include(p => p.Expenses)
                 .Include(p => p.StockMovements)
+                .Include(p => p.Custodies)
                 .Include(p => p.Missions).ThenInclude(m => m.MissionWorkers).ThenInclude(w => w.Employee)
                 .AsSplitQuery()
                 .ToListAsync();
 
-            var totalContractValue = projects.Sum(p => p.ContractValue);
-            var totalIncome = projects.Sum(p => p.TotalCollected);
-            var totalExpenses = projects.Sum(p => p.TotalMaterialsCost + p.TotalPettyExpenses + p.TotalLaborCost);
+            var hasFilter = from.HasValue || to.HasValue;
+            var filterFrom = from ?? DateTime.MinValue;
+            var filterTo = to.HasValue ? to.Value.Date.AddDays(1).AddTicks(-1) : DateTime.MaxValue;
+
+            decimal totalContractValue, totalIncome, totalExpenses;
+            if (hasFilter)
+            {
+                totalContractValue = projects.Where(p => p.CreatedAt >= filterFrom && p.CreatedAt <= filterTo).Sum(p => p.ContractValue);
+                totalIncome = projects.SelectMany(p => p.Payments).Where(p => p.CheckStatus != CheckStatus.Cancelled && p.PaymentDate >= filterFrom && p.PaymentDate <= filterTo).Sum(p => p.Amount);
+
+                var pettyExpensesInRange = projects.SelectMany(p => p.Expenses)
+                    .Where(e => e.ExpenseDate >= filterFrom && e.ExpenseDate <= filterTo).Sum(e => e.Amount);
+                var materialsCostInRange = projects.SelectMany(p => p.StockMovements)
+                    .Where(m => m.MovementType == MovementType.IssueToProject && m.MovementDate >= filterFrom && m.MovementDate <= filterTo)
+                    .Sum(m => m.Quantity * m.UnitPriceAtTime);
+                var laborCostInRange = projects.SelectMany(p => p.Missions)
+                    .Where(m => m.StartDate >= filterFrom && m.StartDate <= filterTo).Sum(m => m.TotalLaborCost);
+                var custodyCostInRange = projects.SelectMany(p => p.Missions)
+                    .Where(m => m.StartDate >= filterFrom && m.StartDate <= filterTo)
+                    .Sum(m => m.Status == MissionStatus.Settled ? Math.Min(m.ActualSpent, m.AdvanceAmount) : m.AdvanceAmount)
+                    + projects.SelectMany(p => p.Custodies)
+                    .Where(c => c.IssueDate >= filterFrom && c.IssueDate <= filterTo)
+                    .Sum(c => c.Status == CustodyStatus.Settled ? c.SettledAmount ?? c.Amount : c.Amount);
+                totalExpenses = pettyExpensesInRange + materialsCostInRange + laborCostInRange + custodyCostInRange;
+            }
+            else
+            {
+                totalContractValue = projects.Sum(p => p.ContractValue);
+                totalIncome = projects.Sum(p => p.TotalCollected);
+                totalExpenses = projects.Sum(p => p.TotalCost);
+            }
+
+            // رصيد مستحق للتحصيل ورصيد الخزنة أرقام لحظية (مش مرتبطة بفترة)، فبتفضل زي ما هي بغض النظر عن الفلتر
             var totalReceivables = projects.Sum(p => p.RemainingBalance);
 
             var materials = await _unitOfWork.Material.GetAllAsync();
@@ -55,8 +86,8 @@ namespace KMG.Core.Services
             var supplierBalances = suppliers.Select(s => new
             {
                 s.Name,
-                Remaining = s.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime)
-                    - s.Payments.Sum(p => p.Amount)
+                Remaining = s.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime + m.TransportCost)
+                    - s.Payments.Where(p => p.CheckStatus != CheckStatus.Cancelled).Sum(p => p.Amount)
             }).ToList();
 
             var suppliersWithBalance = supplierBalances.Count(s => s.Remaining > 0);
@@ -111,12 +142,15 @@ namespace KMG.Core.Services
                     Status = p.Status.ToString(),
                     ContractValue = p.ContractValue,
                     TotalCollected = p.TotalCollected,
-                    ActualCost = p.TotalMaterialsCost + p.TotalPettyExpenses + p.TotalLaborCost,
+                    ActualCost = p.TotalCost,
                     NetProfit = p.NetProfit,
                     ProgressPercent = ProjectProgressPercent(p.Status)
                 }).ToList();
 
-            var monthlyTrend = BuildMonthlyTrend(projects, now);
+            var trendMonths = hasFilter
+                ? MonthsInRange(from ?? projects.Min(p => (DateTime?)p.CreatedAt) ?? now, to ?? now)
+                : Enumerable.Range(0, 6).Select(i => new DateTime(now.Year, now.Month, 1).AddMonths(-5 + i)).ToList();
+            var monthlyTrend = BuildMonthlyTrend(projects, trendMonths);
             var (incomeChange, expensesChange, netProfitChange, contractValueChange) = ComputeMonthOverMonthChanges(monthlyTrend, projects, now);
 
             return new DashboardDTO
@@ -177,17 +211,32 @@ namespace KMG.Core.Services
             _ => 0
         };
 
-        private List<MonthlyTrendDTO> BuildMonthlyTrend(List<Project> projects, DateTime now)
-        {
-            var months = Enumerable.Range(0, 6)
-                .Select(i => new DateTime(now.Year, now.Month, 1).AddMonths(-5 + i))
-                .ToList();
+        // أقصى عدد شهور نبنيهم في الرسم البياني لو الفلتر غطى مدى طويل جدًا (حماية من استجابة ضخمة)
+        private const int MaxTrendMonths = 36;
 
+        private static List<DateTime> MonthsInRange(DateTime from, DateTime to)
+        {
+            var start = new DateTime(from.Year, from.Month, 1);
+            var end = new DateTime(to.Year, to.Month, 1);
+            var months = new List<DateTime>();
+            var cursor = start;
+            while (cursor <= end && months.Count < MaxTrendMonths)
+            {
+                months.Add(cursor);
+                cursor = cursor.AddMonths(1);
+            }
+            return months;
+        }
+
+        private List<MonthlyTrendDTO> BuildMonthlyTrend(List<Project> projects, List<DateTime> months)
+        {
             var payments = projects.SelectMany(p => p.Payments).ToList();
             var expenses = projects.SelectMany(p => p.Expenses).ToList();
             var issuedMaterials = projects.SelectMany(p => p.StockMovements)
                 .Where(m => m.MovementType == MovementType.IssueToProject)
                 .ToList();
+
+            var spansMultipleYears = months.Select(m => m.Year).Distinct().Count() > 1;
 
             return months.Select(monthStart =>
             {
@@ -196,9 +245,10 @@ namespace KMG.Core.Services
                 var pettyExpenses = expenses.Where(e => e.ExpenseDate >= monthStart && e.ExpenseDate < monthEnd).Sum(e => e.Amount);
                 var materialsCost = issuedMaterials.Where(m => m.MovementDate >= monthStart && m.MovementDate < monthEnd).Sum(m => m.Quantity * m.UnitPriceAtTime);
                 var expensesTotal = pettyExpenses + materialsCost;
+                var label = ArabicMonths[monthStart.Month - 1] + (spansMultipleYears ? $" {monthStart.Year}" : "");
                 return new MonthlyTrendDTO
                 {
-                    MonthLabel = ArabicMonths[monthStart.Month - 1],
+                    MonthLabel = label,
                     Income = income,
                     Expenses = expensesTotal,
                     NetProfit = income - expensesTotal

@@ -38,5 +38,20 @@ namespace KMG.Api.Controllers
             var id = await _employeeService.CreateWorkerAsync(model);
             return Ok(id);
         }
+
+        [HttpPut("workers")]
+        [AuthorizeAbility("إدارة الموظفين")]
+        public async Task<IActionResult> UpdateWorker([FromBody] UpdateWorkerDTO model)
+        {
+            try
+            {
+                var result = await _employeeService.UpdateWorkerAsync(model);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

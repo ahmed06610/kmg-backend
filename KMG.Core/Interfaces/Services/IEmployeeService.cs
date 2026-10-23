@@ -12,5 +12,11 @@ namespace KMG.Core.Interfaces.Services
         /// ومحتاجين نتابع أجرهم وسلفهم بس مش محتاجين يسجلوا دخول للنظام.
         /// </summary>
         Task<int> CreateWorkerAsync(CreateWorkerDTO model);
+
+        /// <summary>
+        /// تعديل بيانات موظف بدون حساب دخول (عامل). الموظفين اللي عندهم حساب دخول
+        /// بيتعدّلوا عن طريق AuthService.EditEmployeeAsync بدل الميثود دي.
+        /// </summary>
+        Task<bool> UpdateWorkerAsync(UpdateWorkerDTO model);
     }
 }

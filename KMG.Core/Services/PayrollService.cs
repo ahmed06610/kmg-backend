@@ -165,7 +165,9 @@ namespace KMG.Core.Services
                 Amount = model.Amount,
                 Reason = model.Reason,
                 Date = model.Date,
-                Applied = false
+                Applied = false,
+                Hours = model.Hours,
+                HourlyRate = model.HourlyRate
             };
 
             await _unitOfWork.PayrollAdjustment.AddAsync(adjustment);
@@ -190,6 +192,8 @@ namespace KMG.Core.Services
             adjustment.Amount = model.Amount;
             adjustment.Reason = model.Reason;
             adjustment.Date = model.Date;
+            adjustment.Hours = model.Hours;
+            adjustment.HourlyRate = model.HourlyRate;
             _unitOfWork.PayrollAdjustment.Update(adjustment);
             await _unitOfWork.CompleteAsync();
 
@@ -245,7 +249,13 @@ namespace KMG.Core.Services
                     DeductionsAmount = preview.DeductionsAmount,
                     BonusAmount = preview.BonusAmount,
                     AdvanceInstallmentAmount = preview.AdvanceInstallmentAmount,
+                    InsuranceAmount = preview.InsuranceAmount,
+                    MisrInsuranceAmount = preview.MisrInsuranceAmount,
                     NetPaid = preview.NetPaid,
+                    WorkshopDays = preview.WorkshopDays,
+                    MissionDays = preview.MissionDays,
+                    HourlyDeductionAmount = preview.HourlyDeductionAmount,
+                    HourlyBonusAmount = preview.HourlyBonusAmount,
                     PaidDate = TimeHelper.NowInEgypt,
                     CreatedByEmployeeId = createdByEmployeeId
                 };
@@ -256,6 +266,7 @@ namespace KMG.Core.Services
                 foreach (var adjustment in adjustmentsToApply)
                 {
                     adjustment.Applied = true;
+                    adjustment.AppliedInPayrollPayoutId = payout.Id;
                     _unitOfWork.PayrollAdjustment.Update(adjustment);
                 }
 
@@ -268,6 +279,13 @@ namespace KMG.Core.Services
                         advance.Status = AdvanceStatus.Settled;
                     }
                     _unitOfWork.Advance.Update(advance);
+
+                    await _unitOfWork.PayrollAdvanceCharge.AddAsync(new PayrollAdvanceCharge
+                    {
+                        PayrollPayoutId = payout.Id,
+                        AdvanceId = advance.Id,
+                        ChargedAmount = chargedAmount
+                    });
                 }
 
                 await _cashBoxService.RecordTransactionAsync(
@@ -282,6 +300,103 @@ namespace KMG.Core.Services
                 await transaction.CommitAsync();
 
                 return MapPayout(payout, employee);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        // تعديل مباشر لأرقام راتب اتصرف بالفعل (زي غلطة كتابة في قيمة ما) - بيرجّع حركة الخزنة القديمة
+        // ويسجل واحدة جديدة بالصافي المعدّل. مينفعش غير على القيم نفسها - لو محتاج يلغي خصم/سلفة
+        // مرتبطة بالراتب ده، يحذف الراتب كله بدل كده (DeletePayrollPayoutAsync) وبعدين يصرفه تاني.
+        public async Task<PayrollPayoutDTO> UpdatePayrollPayoutAsync(UpdatePayrollPayoutDTO model, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var payout = await _unitOfWork.PayrollPayout.GetQueryable(p => p.Id == model.Id)
+                    .Include(p => p.Employee)
+                    .FirstOrDefaultAsync() ?? throw new Exception("الراتب غير موجود");
+
+                var netPaid = model.BaseAmount + model.MissionDoubleUpAmount + model.BonusAmount
+                    - model.DeductionsAmount - model.AdvanceInstallmentAmount - model.InsuranceAmount - model.MisrInsuranceAmount;
+                if (netPaid < 0)
+                    throw new Exception($"صافي المستحق سالب ({netPaid}) - راجع القيم المدخلة");
+
+                await _cashBoxService.ReverseAsync(t => t.PayrollPayoutId == payout.Id);
+
+                payout.BaseAmount = model.BaseAmount;
+                payout.MissionDoubleUpAmount = model.MissionDoubleUpAmount;
+                payout.DeductionsAmount = model.DeductionsAmount;
+                payout.BonusAmount = model.BonusAmount;
+                payout.AdvanceInstallmentAmount = model.AdvanceInstallmentAmount;
+                payout.InsuranceAmount = model.InsuranceAmount;
+                payout.MisrInsuranceAmount = model.MisrInsuranceAmount;
+                payout.NetPaid = netPaid;
+                _unitOfWork.PayrollPayout.Update(payout);
+
+                await _cashBoxService.RecordTransactionAsync(
+                    amountCash: -netPaid,
+                    amountCredit: 0,
+                    type: TransactionType.PayrollOut,
+                    description: $"تعديل مستحقات الموظف {payout.Employee.Name} عن الفترة {payout.PeriodStart:yyyy-MM-dd} إلى {payout.PeriodEnd:yyyy-MM-dd}",
+                    createdByEmployeeId: employeeId,
+                    payrollPayoutId: payout.Id);
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return MapPayout(payout, payout.Employee);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        // إلغاء راتب كامل: بيرجّع حركة الخزنة، وأي خصم/حافز اتطبق بسبب الراتب ده يرجع "غير مطبّق"
+        // تاني عشان يتحسب في أول راتب جديد، وأي قسط سلفة اتخصم بسببه يرجع لرصيد السلفة
+        public async Task<bool> DeletePayrollPayoutAsync(int id)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var payout = await _unitOfWork.PayrollPayout.GetByIdAsync(id);
+                if (payout == null) return false;
+
+                await _cashBoxService.ReverseAsync(t => t.PayrollPayoutId == id);
+
+                var unAppliedAdjustments = await _unitOfWork.PayrollAdjustment
+                    .GetQueryable(a => a.AppliedInPayrollPayoutId == id)
+                    .ToListAsync();
+                foreach (var adjustment in unAppliedAdjustments)
+                {
+                    adjustment.Applied = false;
+                    adjustment.AppliedInPayrollPayoutId = null;
+                    _unitOfWork.PayrollAdjustment.Update(adjustment);
+                }
+
+                var advanceCharges = await _unitOfWork.PayrollAdvanceCharge
+                    .GetQueryable(c => c.PayrollPayoutId == id)
+                    .Include(c => c.Advance)
+                    .ToListAsync();
+                foreach (var charge in advanceCharges)
+                {
+                    charge.Advance.RemainingAmount += charge.ChargedAmount;
+                    if (charge.Advance.Status == AdvanceStatus.Settled && charge.Advance.RemainingAmount > 0)
+                        charge.Advance.Status = AdvanceStatus.Active;
+                    _unitOfWork.Advance.Update(charge.Advance);
+                }
+                _unitOfWork.PayrollAdvanceCharge.DeleteRange(advanceCharges);
+
+                _unitOfWork.PayrollPayout.Delete(payout);
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+                return true;
             }
             catch
             {
@@ -314,33 +429,50 @@ namespace KMG.Core.Services
 
             decimal baseAmount;
             decimal missionDoubleUp = 0;
+            var periodDays = (periodEnd.Date - periodStart.Date).Days + 1;
+            decimal missionDaysInPeriod = 0;
+            // يوم الجمعة إجازة للعامل اليومي - مالوش يومية عليه، فبيتشال من أيام الفترة
+            var fridaysInPeriod = CountFridays(periodStart.Date, periodEnd.Date);
+            decimal missionFridayDays = 0;
 
             if (employee.WageType == WageType.Monthly)
             {
                 baseAmount = employee.WageAmount;
+                fridaysInPeriod = 0; // الشهري راتبه ثابت، مفيش استبعاد أيام
             }
             else
             {
-                var periodDays = (periodEnd.Date - periodStart.Date).Days + 1;
-                baseAmount = employee.WageAmount * periodDays;
+                baseAmount = employee.WageAmount * (periodDays - fridaysInPeriod);
 
                 var missionWorkerRecords = await _unitOfWork.MissionWorker
                     .GetQueryable(w => w.EmployeeId == employeeId)
                     .Include(w => w.Mission)
                     .ToListAsync();
 
+                // بنحسب التداخل بحدود نصف مفتوحة [بداية، نهاية) بالكسور، عشان DaysCount ممكن يبقى
+                // رقم كسري (3.5 يوم مثلًا) - .TotalDays بيدينا الفرق بالساعات كسر، مش يوم صحيح مقطوع
+                var periodStartDay = periodStart.Date;
+                var periodEndExclusive = periodEnd.Date.AddDays(1);
+
                 foreach (var record in missionWorkerRecords)
                 {
-                    var missionStart = record.Mission.StartDate.Date;
-                    var missionEnd = missionStart.AddDays(Math.Max(record.DaysCount - 1, 0));
+                    var missionStartDay = record.Mission.StartDate.Date;
+                    var missionEndExclusive = missionStartDay.AddDays((double)record.DaysCount);
 
-                    var overlapStart = missionStart > periodStart.Date ? missionStart : periodStart.Date;
-                    var overlapEnd = missionEnd < periodEnd.Date ? missionEnd : periodEnd.Date;
+                    var overlapStart = missionStartDay > periodStartDay ? missionStartDay : periodStartDay;
+                    var overlapEndExclusive = missionEndExclusive < periodEndExclusive ? missionEndExclusive : periodEndExclusive;
 
-                    if (overlapEnd >= overlapStart)
+                    if (overlapEndExclusive > overlapStart)
                     {
-                        var daysInPeriod = (overlapEnd - overlapStart).Days + 1;
-                        missionDoubleUp += daysInPeriod * employee.WageAmount;
+                        // اليومية العادية اتحسبت بالفعل في baseAmount لأيام الفترة (من غير الجمع) - هنا بنضيف
+                        // الفرق بين الأجر اليومي اللي المستخدم حدده لأيام المأمورية دي وبين اليومية العادية.
+                        // الجمعة اللي العامل بيكون فيها في مأمورية بيشتغل فعلًا، فبتاخد أجر المأمورية كامل:
+                        // الفرق + اليومية العادية اللي اتشالت من الأساسي بسبب الجمعة
+                        var daysInPeriod = (decimal)(overlapEndExclusive - overlapStart).TotalDays;
+                        var fridayPortion = FridayOverlapDays(overlapStart, overlapEndExclusive);
+                        missionDoubleUp += daysInPeriod * (record.DailyRate - employee.WageAmount) + fridayPortion * employee.WageAmount;
+                        missionDaysInPeriod += daysInPeriod;
+                        missionFridayDays += fridayPortion;
                     }
                 }
             }
@@ -352,6 +484,9 @@ namespace KMG.Core.Services
 
             var deductions = adjustments.Where(a => a.Type == AdjustmentType.Deduction).Sum(a => a.Amount);
             var bonuses = adjustments.Where(a => a.Type == AdjustmentType.Bonus).Sum(a => a.Amount);
+            // جزء من الخصم/الحافز محسوب بالساعة - للعرض/التصدير بس (مش جزء زيادة في الحساب، هو أصلًا داخل deductions/bonuses)
+            var hourlyDeduction = adjustments.Where(a => a.Type == AdjustmentType.Deduction && a.Hours != null).Sum(a => a.Amount);
+            var hourlyBonus = adjustments.Where(a => a.Type == AdjustmentType.Bonus && a.Hours != null).Sum(a => a.Amount);
 
             var activeAdvances = await _unitOfWork.Advance
                 .GetQueryable(a => a.EmployeeId == employeeId && a.Status == AdvanceStatus.Active)
@@ -369,7 +504,8 @@ namespace KMG.Core.Services
                 }
             }
 
-            var netPaid = baseAmount + missionDoubleUp + bonuses - deductions - advanceInstallmentTotal;
+            var netPaid = baseAmount + missionDoubleUp + bonuses - deductions - advanceInstallmentTotal
+                - employee.InsuranceAmount - employee.MisrInsuranceAmount;
 
             var preview = new PayrollPreviewDTO
             {
@@ -382,10 +518,40 @@ namespace KMG.Core.Services
                 DeductionsAmount = deductions,
                 BonusAmount = bonuses,
                 AdvanceInstallmentAmount = advanceInstallmentTotal,
-                NetPaid = netPaid
+                InsuranceAmount = employee.InsuranceAmount,
+                MisrInsuranceAmount = employee.MisrInsuranceAmount,
+                NetPaid = netPaid,
+                // أيام الورشة = أيام الفترة من غير الجمع ومن غير أيام المأمورية (اللي مش جمعة)
+                WorkshopDays = Math.Max(periodDays - fridaysInPeriod - (missionDaysInPeriod - missionFridayDays), 0),
+                MissionDays = missionDaysInPeriod,
+                ExcludedFridays = Math.Max(fridaysInPeriod - missionFridayDays, 0),
+                HourlyDeductionAmount = hourlyDeduction,
+                HourlyBonusAmount = hourlyBonus
             };
 
             return (preview, adjustments, advancesToCharge, employee);
+        }
+
+        private static int CountFridays(DateTime fromDay, DateTime toDay)
+        {
+            var count = 0;
+            for (var day = fromDay; day <= toDay; day = day.AddDays(1))
+                if (day.DayOfWeek == DayOfWeek.Friday) count++;
+            return count;
+        }
+
+        // جزء المدة [start, endExclusive) اللي واقع في أيام جمعة - بالكسور، عشان أيام المأمورية ممكن تبقى كسرية
+        private static decimal FridayOverlapDays(DateTime start, DateTime endExclusive)
+        {
+            decimal total = 0;
+            for (var day = start.Date; day < endExclusive; day = day.AddDays(1))
+            {
+                if (day.DayOfWeek != DayOfWeek.Friday) continue;
+                var from = day > start ? day : start;
+                var to = day.AddDays(1) < endExclusive ? day.AddDays(1) : endExclusive;
+                if (to > from) total += (decimal)(to - from).TotalDays;
+            }
+            return total;
         }
 
         private static AdvanceDTO MapAdvance(Advance a, Employee? employee = null) => new()
@@ -410,7 +576,9 @@ namespace KMG.Core.Services
             Amount = a.Amount,
             Reason = a.Reason,
             Date = a.Date,
-            Applied = a.Applied
+            Applied = a.Applied,
+            Hours = a.Hours,
+            HourlyRate = a.HourlyRate
         };
 
         private static PayrollPayoutDTO MapPayout(PayrollPayout p, Employee employee) => new()
@@ -425,7 +593,13 @@ namespace KMG.Core.Services
             DeductionsAmount = p.DeductionsAmount,
             BonusAmount = p.BonusAmount,
             AdvanceInstallmentAmount = p.AdvanceInstallmentAmount,
+            InsuranceAmount = p.InsuranceAmount,
+            MisrInsuranceAmount = p.MisrInsuranceAmount,
             NetPaid = p.NetPaid,
+            WorkshopDays = p.WorkshopDays,
+            MissionDays = p.MissionDays,
+            HourlyDeductionAmount = p.HourlyDeductionAmount,
+            HourlyBonusAmount = p.HourlyBonusAmount,
             PaidDate = p.PaidDate
         };
     }

@@ -96,6 +96,8 @@ namespace KMG.Core.Services
                     EmployeeType = model.EmployeeType,
                     WageType = model.WageType,
                     WageAmount = model.WageAmount,
+                    InsuranceAmount = model.InsuranceAmount,
+                    MisrInsuranceAmount = model.MisrInsuranceAmount,
                     CreatedAt = TimeHelper.NowInEgypt,
                     Suspended = false
                 };
@@ -139,6 +141,8 @@ namespace KMG.Core.Services
                 employee.EmployeeType = model.EmployeeType;
                 employee.WageType = model.WageType;
                 employee.WageAmount = model.WageAmount;
+                employee.InsuranceAmount = model.InsuranceAmount;
+                employee.MisrInsuranceAmount = model.MisrInsuranceAmount;
                 _unitOfWork.Employee.Update(employee);
 
                 user.Name = model.Name;

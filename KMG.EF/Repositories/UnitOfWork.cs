@@ -37,14 +37,20 @@ namespace KMG.EF.Repositories
         public IAdvanceRepository Advance { get; }
         public IPayrollAdjustmentRepository PayrollAdjustment { get; }
         public IPayrollPayoutRepository PayrollPayout { get; }
+        public IPayrollAdvanceChargeRepository PayrollAdvanceCharge { get; }
 
         public ICashBoxRepository CashBox { get; }
         public ICashBoxTransactionRepository CashBoxTransaction { get; }
         public IMiscExpenseRepository MiscExpense { get; }
+        public ICustodyRepository Custody { get; }
+        public IInsurancePayoutRepository InsurancePayout { get; }
+        public IMisrInsurancePayoutRepository MisrInsurancePayout { get; }
 
         public IAiPromptConfigRepository AiPromptConfig { get; }
         public INotificationRepository Notification { get; }
         public IAiTenderResultRepository AiTenderResult { get; }
+        public IAiChatMessageRepository AiChatMessage { get; }
+        public IGeneratedInvoiceRepository GeneratedInvoice { get; }
 
         public UnitOfWork(ApplicationDbContext context)
         {
@@ -78,14 +84,20 @@ namespace KMG.EF.Repositories
             Advance = new AdvanceRepository(context);
             PayrollAdjustment = new PayrollAdjustmentRepository(context);
             PayrollPayout = new PayrollPayoutRepository(context);
+            PayrollAdvanceCharge = new PayrollAdvanceChargeRepository(context);
 
             CashBox = new CashBoxRepository(context);
             CashBoxTransaction = new CashBoxTransactionRepository(context);
             MiscExpense = new MiscExpenseRepository(context);
+            Custody = new CustodyRepository(context);
+            InsurancePayout = new InsurancePayoutRepository(context);
+            MisrInsurancePayout = new MisrInsurancePayoutRepository(context);
 
             AiPromptConfig = new AiPromptConfigRepository(context);
             Notification = new NotificationRepository(context);
             AiTenderResult = new AiTenderResultRepository(context);
+            AiChatMessage = new AiChatMessageRepository(context);
+            GeneratedInvoice = new GeneratedInvoiceRepository(context);
         }
 
         public async Task<IDbContextTransaction> BeginTransactionAsync()

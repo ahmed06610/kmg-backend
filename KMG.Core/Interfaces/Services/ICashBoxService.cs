@@ -9,11 +9,17 @@ namespace KMG.Core.Interfaces.Services
     {
         Task<CashBoxDetailsDTO> GetDetailsAsync(int recentCount = 50);
 
-        Task<PagedResultDTO<CashBoxTransactionDTO>> GetTransactionsAsync(CashBoxTransactionFilterDTO filter);
+        Task<CashBoxTransactionsResultDTO> GetTransactionsAsync(CashBoxTransactionFilterDTO filter);
 
         Task<MiscExpenseDTO> CreateMiscExpenseAsync(CreateMiscExpenseDTO model, int createdByEmployeeId);
         Task<MiscExpenseDTO> UpdateMiscExpenseAsync(UpdateMiscExpenseDTO model, int employeeId);
         Task<bool> DeleteMiscExpenseAsync(int id);
+
+        /// <summary>
+        /// تعديل يدوي مباشر لرصيدي الخزنة (كاش/كريديت) - بيتسجل كحركة عادية في سجل الخزنة
+        /// بالفرق بين الرصيد القديم والجديد عشان السجل يفضل متسق مع الرصيد الفعلي.
+        /// </summary>
+        Task<CashBoxDetailsDTO> AdjustBalanceAsync(AdjustCashBoxDTO model, int employeeId);
 
         /// <summary>
         /// يسجل حركة في الخزنة المركزية ويحدّث رصيدها.
@@ -33,7 +39,11 @@ namespace KMG.Core.Interfaces.Services
             int? advanceId = null,
             int? projectPaymentId = null,
             int? supplierPaymentId = null,
-            int? miscExpenseId = null);
+            int? miscExpenseId = null,
+            int? custodyId = null,
+            int? insurancePayoutId = null,
+            int? misrInsurancePayoutId = null,
+            int? stockMovementId = null);
 
         /// <summary>
         /// يلغي أثر كل حركات الخزنة اللي بتطابق الفلتر (بيطرح مبالغها من رصيد الخزنة) ويمسحها،

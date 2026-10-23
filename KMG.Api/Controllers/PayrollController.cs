@@ -146,5 +146,34 @@ namespace KMG.Api.Controllers
         {
             return Ok(await _payrollService.GetPayoutHistoryAsync(employeeId));
         }
+
+        [HttpPut("payouts")]
+        [AuthorizeAbility("إدارة الرواتب")]
+        public async Task<IActionResult> UpdatePayout([FromBody] UpdatePayrollPayoutDTO model)
+        {
+            try
+            {
+                return Ok(await _payrollService.UpdatePayrollPayoutAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("payouts/{id}")]
+        [AuthorizeAbility("إدارة الرواتب")]
+        public async Task<IActionResult> DeletePayout(int id)
+        {
+            try
+            {
+                var result = await _payrollService.DeletePayrollPayoutAsync(id);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

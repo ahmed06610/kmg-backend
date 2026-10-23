@@ -26,6 +26,7 @@ namespace KMG.Core.Services
                  .Include(p => p.Expenses)
                  .Include(p => p.StockMovements)
                  .Include(p => p.WriteOffs)
+                 .Include(p => p.Custodies).ThenInclude(c => c.Employee)
                  .Include(p => p.Missions).ThenInclude(m => m.MissionWorkers).ThenInclude(w => w.Employee);
 
         public async Task<List<ProjectListDTO>> GetAllAsync()
@@ -72,22 +73,29 @@ namespace KMG.Core.Services
                 ClientEmail = project.Client.Email,
                 ClientAddress = project.Client.Address,
                 Description = project.Description,
+                TenderInsurancePercent = project.TenderInsurancePercent,
                 TenderInsuranceAmount = project.TenderInsuranceAmount,
+                InsuranceDueDate = project.InsuranceDueDate,
+                InsuranceRecovered = project.InsuranceRecovered,
+                TenderTaxPercent = project.TenderTaxPercent,
                 TenderTaxAmount = project.TenderTaxAmount,
+                WorkGuaranteePercent = project.WorkGuaranteePercent,
+                WorkGuaranteeAmount = project.WorkGuaranteeAmount,
+                WorkGuaranteeDueDate = project.WorkGuaranteeDueDate,
+                WorkGuaranteeRecovered = project.WorkGuaranteeRecovered,
+                ContractValueWithTax = project.ContractValueWithTax,
+                EffectiveContractValue = project.EffectiveContractValue,
                 SupplyProfitMargin = project.SupplyProfitMargin,
                 TotalMaterialsCost = project.TotalMaterialsCost,
                 TotalPettyExpenses = project.TotalPettyExpenses,
                 TotalLaborCost = project.TotalLaborCost,
                 TotalWriteOffs = project.TotalWriteOffs,
-                Payments = project.Payments.OrderByDescending(p => p.PaymentDate).Select(p => new ProjectPaymentDTO
-                {
-                    Id = p.Id,
-                    Amount = p.Amount,
-                    AmountCash = p.AmountCash,
-                    AmountCredit = p.AmountCredit,
-                    PaymentDate = p.PaymentDate,
-                    Notes = p.Notes
-                }).ToList(),
+                TotalMissionCustodyCost = project.TotalMissionCustodyCost,
+                TotalSideCustodyCost = project.TotalSideCustodyCost,
+                TotalCustodyCost = project.TotalCustodyCost,
+                TotalCost = project.TotalCost,
+                Payments = project.Payments.OrderByDescending(p => p.PaymentDate).Select(MapPayment).ToList(),
+                Custodies = project.Custodies.OrderByDescending(c => c.IssueDate).Select(CustodyService.MapCustody).ToList(),
                 Expenses = project.Expenses.OrderByDescending(e => e.ExpenseDate).Select(e => new ProjectExpenseDTO
                 {
                     Id = e.Id,
@@ -95,7 +103,8 @@ namespace KMG.Core.Services
                     Category = e.Category.ToString(),
                     Description = e.Description,
                     ExpenseDate = e.ExpenseDate,
-                    AttachmentUrl = e.AttachmentUrl
+                    AttachmentUrl = e.AttachmentUrl,
+                    AttachmentFileName = e.AttachmentFileName
                 }).ToList(),
                 StockMovements = project.StockMovements.OrderByDescending(m => m.MovementDate).Select(m => new StockMovementDTO
                 {
@@ -136,6 +145,7 @@ namespace KMG.Core.Services
                 }).ToList(),
                 CanDelete = !project.Payments.Any() && !project.Expenses.Any() && !project.Missions.Any()
                     && !project.StockMovements.Any() && !project.Attachments.Any() && !project.WriteOffs.Any()
+                    && !project.Custodies.Any()
             };
         }
 
@@ -155,15 +165,18 @@ namespace KMG.Core.Services
                     ClientId = model.ClientId,
                     ContractValue = model.ContractValue,
                     Description = model.Description,
-                    TenderInsuranceAmount = model.TenderInsuranceAmount,
-                    TenderTaxAmount = model.TenderTaxAmount,
+                    TenderInsurancePercent = model.TenderInsurancePercent,
+                    InsuranceDueDate = model.InsuranceDueDate,
+                    TenderTaxPercent = model.TenderTaxPercent,
+                    WorkGuaranteePercent = model.WorkGuaranteePercent,
+                    WorkGuaranteeDueDate = model.WorkGuaranteeDueDate,
                     SupplyProfitMargin = model.SupplyProfitMargin,
                     CreatedByEmployeeId = createdByEmployeeId,
                     CreatedAt = TimeHelper.NowInEgypt
                 };
 
                 await _unitOfWork.Project.AddAsync(project);
-                await _unitOfWork.CompleteAsync(); // نحتاج project.Id لو هننشئ مصاريف التأمين/الضريبة تحته
+                await _unitOfWork.CompleteAsync(); // نحتاج project.Id لو هننشئ مصروف التأمين/الضمان تحته
 
                 await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
                 {
@@ -173,13 +186,10 @@ namespace KMG.Core.Services
                     ActionDescription = "تم إنشاء المشروع"
                 });
 
-                // تأمين وضريبة المناقصة (لو موجودين) بيتسجلوا كمصروف نثري فعلي وحركة خزنة صادرة،
-                // مش مجرد حقول مخزّنة، عشان يدخلوا في صافي ربح المشروع ورصيد الخزنة فعليًا
-                if (model.TenderInsuranceAmount is > 0)
-                    await RecordTenderCostAsync(project, model.TenderInsuranceAmount.Value, ExpenseCategory.TenderInsurance, "تأمين المناقصة", createdByEmployeeId);
-
-                if (model.TenderTaxAmount is > 0)
-                    await RecordTenderCostAsync(project, model.TenderTaxAmount.Value, ExpenseCategory.TenderTax, "ضريبة المناقصة", createdByEmployeeId);
+                // تأمين المناقصة وضمان الأعمال (لو موجودين) بيتسجلوا كمصروف نثري فعلي وحركة خزنة صادرة،
+                // عشان يدخلوا في صافي ربح المشروع ورصيد الخزنة فعليًا. الضريبة مختلفة: مجرد رقم
+                // بيتضاف على قيمة العقد المطلوب تحصيلها (ContractValueWithTax) من غير أي أثر في الخزنة
+                await SyncInsuranceAndGuaranteeExpensesAsync(project, createdByEmployeeId);
 
                 await _unitOfWork.CompleteAsync();
                 await transaction.CommitAsync();
@@ -193,8 +203,29 @@ namespace KMG.Core.Services
             }
         }
 
-        private async Task RecordTenderCostAsync(Project project, decimal amount, ExpenseCategory category, string description, int createdByEmployeeId)
+        // بيزامن مصروف التأمين/الضمان مع النسبة والقيمة المحسوبة الحالية للمشروع: بيمسح المصروف
+        // القديم (وحركة الخزنة بتاعته) لو موجود ومنعاد استرداده بعد، وبيعيد إنشاءه بالمبلغ الجديد -
+        // بينادى وقت الإنشاء وكل مرة يتغيّر فيها الـ percent أو قيمة العقد وقت التعديل
+        private async Task SyncInsuranceAndGuaranteeExpensesAsync(Project project, int employeeId)
         {
+            await SyncTenderCostAsync(project, ExpenseCategory.TenderInsurance, project.TenderInsuranceAmount, project.InsuranceRecovered, "تأمين المناقصة", employeeId);
+            await SyncTenderCostAsync(project, ExpenseCategory.WorkGuarantee, project.WorkGuaranteeAmount, project.WorkGuaranteeRecovered, "ضمان الأعمال", employeeId);
+        }
+
+        private async Task SyncTenderCostAsync(Project project, ExpenseCategory category, decimal amount, bool recovered, string description, int employeeId)
+        {
+            if (recovered) return; // اتسترد بالفعل - منلمسوش تاني
+
+            var existing = await _unitOfWork.ProjectExpense.GetQueryable(e => e.ProjectId == project.Id && e.Category == category).FirstOrDefaultAsync();
+            if (existing != null)
+            {
+                await _cashBoxService.ReverseAsync(t => t.ProjectExpenseId == existing.Id);
+                _unitOfWork.ProjectExpense.Delete(existing);
+                await _unitOfWork.CompleteAsync();
+            }
+
+            if (amount <= 0) return;
+
             var expense = new ProjectExpense
             {
                 ProjectId = project.Id,
@@ -202,7 +233,7 @@ namespace KMG.Core.Services
                 Category = category,
                 Description = description,
                 ExpenseDate = project.CreatedAt,
-                CreatedByEmployeeId = createdByEmployeeId
+                CreatedByEmployeeId = employeeId
             };
 
             await _unitOfWork.ProjectExpense.AddAsync(expense);
@@ -213,20 +244,76 @@ namespace KMG.Core.Services
                 amountCredit: 0,
                 type: TransactionType.ProjectExpenseOut,
                 description: $"{description} - مشروع {project.ProjectCode}",
-                createdByEmployeeId: createdByEmployeeId,
+                createdByEmployeeId: employeeId,
                 projectId: project.Id,
                 projectExpenseId: expense.Id);
         }
 
         public async Task<bool> UpdateAsync(UpdateProjectDTO model, int employeeId)
         {
-            var project = await _unitOfWork.Project.GetByIdAsync(model.Id);
-            if (project == null) return false;
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var project = await _unitOfWork.Project.GetByIdAsync(model.Id);
+                if (project == null) return false;
 
-            project.Name = model.Name;
-            project.Description = model.Description;
-            project.ClientId = model.ClientId;
-            project.ContractValue = model.ContractValue;
+                project.Name = model.Name;
+                project.Description = model.Description;
+                project.ClientId = model.ClientId;
+                project.ContractValue = model.ContractValue;
+                project.TenderTaxPercent = model.TenderTaxPercent;
+
+                // لو اتسترد بالفعل، منسمحش بتعديل النسبة/التاريخ من هنا - القيمة اتحسبت وسُجّلت
+                // فعليًا وقت الاسترداد، وتغييرها دلوقتي هيبوّظ العرض من غير ما يغيّر حاجة حقيقية في الخزنة
+                if (!project.InsuranceRecovered)
+                {
+                    project.TenderInsurancePercent = model.TenderInsurancePercent;
+                    project.InsuranceDueDate = model.InsuranceDueDate;
+                }
+                if (!project.WorkGuaranteeRecovered)
+                {
+                    project.WorkGuaranteePercent = model.WorkGuaranteePercent;
+                    project.WorkGuaranteeDueDate = model.WorkGuaranteeDueDate;
+                }
+                _unitOfWork.Project.Update(project);
+
+                await SyncInsuranceAndGuaranteeExpensesAsync(project, employeeId);
+
+                await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+                {
+                    ProjectId = project.Id,
+                    EmployeeId = employeeId,
+                    ActionDate = TimeHelper.NowInEgypt,
+                    ActionDescription = "تم تعديل بيانات المشروع"
+                });
+
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<bool> RecoverInsuranceAsync(int projectId, int employeeId)
+        {
+            var project = await _unitOfWork.Project.GetByIdAsync(projectId);
+            if (project == null) return false;
+            if (project.InsuranceRecovered) throw new Exception("تأمين المناقصة مسترد بالفعل");
+            if (project.TenderInsuranceAmount <= 0) throw new Exception("لا يوجد تأمين مسجل لاسترداده");
+
+            await _cashBoxService.RecordTransactionAsync(
+                amountCash: project.TenderInsuranceAmount,
+                amountCredit: 0,
+                type: TransactionType.InsuranceRecoveredIn,
+                description: $"استرداد تأمين مناقصة - مشروع {project.ProjectCode}",
+                createdByEmployeeId: employeeId,
+                projectId: project.Id);
+
+            project.InsuranceRecovered = true;
             _unitOfWork.Project.Update(project);
 
             await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
@@ -234,7 +321,37 @@ namespace KMG.Core.Services
                 ProjectId = project.Id,
                 EmployeeId = employeeId,
                 ActionDate = TimeHelper.NowInEgypt,
-                ActionDescription = "تم تعديل بيانات المشروع"
+                ActionDescription = $"تم استرداد تأمين المناقصة بقيمة {project.TenderInsuranceAmount}"
+            });
+
+            await _unitOfWork.CompleteAsync();
+            return true;
+        }
+
+        public async Task<bool> RecoverGuaranteeAsync(int projectId, int employeeId)
+        {
+            var project = await _unitOfWork.Project.GetByIdAsync(projectId);
+            if (project == null) return false;
+            if (project.WorkGuaranteeRecovered) throw new Exception("ضمان الأعمال مسترد بالفعل");
+            if (project.WorkGuaranteeAmount <= 0) throw new Exception("لا يوجد ضمان أعمال مسجل لاسترداده");
+
+            await _cashBoxService.RecordTransactionAsync(
+                amountCash: project.WorkGuaranteeAmount,
+                amountCredit: 0,
+                type: TransactionType.GuaranteeRecoveredIn,
+                description: $"استرداد ضمان أعمال - مشروع {project.ProjectCode}",
+                createdByEmployeeId: employeeId,
+                projectId: project.Id);
+
+            project.WorkGuaranteeRecovered = true;
+            _unitOfWork.Project.Update(project);
+
+            await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
+            {
+                ProjectId = project.Id,
+                EmployeeId = employeeId,
+                ActionDate = TimeHelper.NowInEgypt,
+                ActionDescription = $"تم استرداد ضمان الأعمال بقيمة {project.WorkGuaranteeAmount}"
             });
 
             await _unitOfWork.CompleteAsync();
@@ -250,13 +367,15 @@ namespace KMG.Core.Services
                 .Include(p => p.StockMovements)
                 .Include(p => p.Attachments)
                 .Include(p => p.WriteOffs)
+                .Include(p => p.Custodies)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync();
             if (project == null) return false;
 
             if (project.Payments.Any() || project.Expenses.Any() || project.Missions.Any()
-                || project.StockMovements.Any() || project.Attachments.Any() || project.WriteOffs.Any())
-                throw new Exception("لا يمكن حذف مشروع له بيانات مسجلة (دفعات/مصاريف/مأموريات/حركات مخزون/مرفقات/خصومات أعمال) - احذفها أولًا");
+                || project.StockMovements.Any() || project.Attachments.Any() || project.WriteOffs.Any()
+                || project.Custodies.Any())
+                throw new Exception("لا يمكن حذف مشروع له بيانات مسجلة (دفعات/مصاريف/مأموريات/عهد/حركات مخزون/مرفقات/خصومات أعمال) - احذفها أولًا");
 
             _unitOfWork.Project.Delete(project);
             await _unitOfWork.CompleteAsync();
@@ -289,6 +408,10 @@ namespace KMG.Core.Services
                 throw new Exception("لا يمكن أن تكون قيمة الكاش أو الكريديت سالبة");
             if (model.AmountCash + model.AmountCredit <= 0)
                 throw new Exception("قيمة الدفعة يجب أن تكون أكبر من صفر");
+            if (model.IsCheck && model.AmountCredit != 0)
+                throw new Exception("دفعة الشيك لا يمكن تقسيمها كاش/كريديت");
+            if (model.IsCheck && model.CheckDueDate == null)
+                throw new Exception("لازم تحديد تاريخ استحقاق الشيك");
 
             using var transaction = await _unitOfWork.BeginTransactionAsync();
             try
@@ -309,20 +432,29 @@ namespace KMG.Core.Services
                     AmountCredit = model.AmountCredit,
                     PaymentDate = model.PaymentDate,
                     Notes = model.Notes,
+                    AttachmentUrl = model.AttachmentUrl,
+                    AttachmentFileName = model.AttachmentFileName,
+                    IsCheck = model.IsCheck,
+                    CheckDueDate = model.IsCheck ? model.CheckDueDate : null,
+                    CheckStatus = model.IsCheck ? Enums.CheckStatus.Pending : null,
                     CreatedByEmployeeId = createdByEmployeeId
                 };
 
                 await _unitOfWork.ProjectPayment.AddAsync(payment);
                 await _unitOfWork.CompleteAsync(); // نحتاج payment.Id عشان نربط بيه حركة الخزنة
 
-                await _cashBoxService.RecordTransactionAsync(
-                    amountCash: model.AmountCash,
-                    amountCredit: model.AmountCredit,
-                    type: TransactionType.ProjectPaymentIn,
-                    description: $"تحصيل دفعة من مشروع: {project.ProjectCode}",
-                    createdByEmployeeId: createdByEmployeeId,
-                    projectId: model.ProjectId,
-                    projectPaymentId: payment.Id);
+                // دفعة الشيك متتسجلش في الخزنة إلا لما تتأكد إنها اتصرفت فعليًا (ResolveCheckAsync)
+                if (!model.IsCheck)
+                {
+                    await _cashBoxService.RecordTransactionAsync(
+                        amountCash: model.AmountCash,
+                        amountCredit: model.AmountCredit,
+                        type: TransactionType.ProjectPaymentIn,
+                        description: $"تحصيل دفعة من مشروع: {project.ProjectCode}",
+                        createdByEmployeeId: createdByEmployeeId,
+                        projectId: model.ProjectId,
+                        projectPaymentId: payment.Id);
+                }
 
                 await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
                 {
@@ -335,15 +467,7 @@ namespace KMG.Core.Services
                 await _unitOfWork.CompleteAsync();
                 await transaction.CommitAsync();
 
-                return new ProjectPaymentDTO
-                {
-                    Id = payment.Id,
-                    Amount = payment.Amount,
-                    AmountCash = payment.AmountCash,
-                    AmountCredit = payment.AmountCredit,
-                    PaymentDate = payment.PaymentDate,
-                    Notes = payment.Notes
-                };
+                return MapPayment(payment);
             }
             catch
             {
@@ -359,6 +483,10 @@ namespace KMG.Core.Services
             var newAmount = model.AmountCash + model.AmountCredit;
             if (newAmount <= 0)
                 throw new Exception("قيمة الدفعة يجب أن تكون أكبر من صفر");
+            if (model.IsCheck && model.AmountCredit != 0)
+                throw new Exception("دفعة الشيك لا يمكن تقسيمها كاش/كريديت");
+            if (model.IsCheck && model.CheckDueDate == null)
+                throw new Exception("لازم تحديد تاريخ استحقاق الشيك");
 
             using var transaction = await _unitOfWork.BeginTransactionAsync();
             try
@@ -369,26 +497,38 @@ namespace KMG.Core.Services
 
                 var project = payment.Project;
                 var otherPaymentsTotal = project.Payments.Where(p => p.Id != payment.Id).Sum(p => p.Amount);
-                if (otherPaymentsTotal + newAmount > project.ContractValue)
-                    throw new Exception($"قيمة الدفعة أكبر من المتبقي على المشروع (المتبقي: {project.ContractValue - otherPaymentsTotal})");
+                if (otherPaymentsTotal + newAmount > project.ContractValueWithTax)
+                    throw new Exception($"قيمة الدفعة أكبر من المتبقي على المشروع (المتبقي: {project.ContractValueWithTax - otherPaymentsTotal})");
 
-                await _cashBoxService.ReverseAsync(t => t.ProjectPaymentId == payment.Id);
+                var wasPostedToCashBox = !payment.IsCheck || payment.CheckStatus == Enums.CheckStatus.Cleared;
+                if (wasPostedToCashBox)
+                    await _cashBoxService.ReverseAsync(t => t.ProjectPaymentId == payment.Id);
 
                 payment.AmountCash = model.AmountCash;
                 payment.AmountCredit = model.AmountCredit;
                 payment.Amount = newAmount;
                 payment.PaymentDate = model.PaymentDate;
                 payment.Notes = model.Notes;
+                payment.AttachmentUrl = model.AttachmentUrl;
+                payment.AttachmentFileName = model.AttachmentFileName;
+                payment.IsCheck = model.IsCheck;
+                payment.CheckDueDate = model.IsCheck ? model.CheckDueDate : null;
+                payment.CheckStatus = model.IsCheck ? (payment.CheckStatus ?? Enums.CheckStatus.Pending) : null;
                 _unitOfWork.ProjectPayment.Update(payment);
 
-                await _cashBoxService.RecordTransactionAsync(
-                    amountCash: payment.AmountCash,
-                    amountCredit: payment.AmountCredit,
-                    type: TransactionType.ProjectPaymentIn,
-                    description: $"تعديل دفعة من مشروع: {project.ProjectCode}",
-                    createdByEmployeeId: employeeId,
-                    projectId: project.Id,
-                    projectPaymentId: payment.Id);
+                var shouldPostToCashBox = !payment.IsCheck || payment.CheckStatus == Enums.CheckStatus.Cleared;
+                if (shouldPostToCashBox)
+                {
+                    // الشيك المتصرف بيدخل رصيد الكريديت دايمًا (نفس منطق ResolveCheckAsync)
+                    await _cashBoxService.RecordTransactionAsync(
+                        amountCash: payment.IsCheck ? 0 : payment.AmountCash,
+                        amountCredit: payment.IsCheck ? payment.Amount : payment.AmountCredit,
+                        type: TransactionType.ProjectPaymentIn,
+                        description: $"تعديل دفعة من مشروع: {project.ProjectCode}",
+                        createdByEmployeeId: employeeId,
+                        projectId: project.Id,
+                        projectPaymentId: payment.Id);
+                }
 
                 await _unitOfWork.ProjectAudit.AddAsync(new ProjectAudit
                 {
@@ -401,15 +541,7 @@ namespace KMG.Core.Services
                 await _unitOfWork.CompleteAsync();
                 await transaction.CommitAsync();
 
-                return new ProjectPaymentDTO
-                {
-                    Id = payment.Id,
-                    Amount = payment.Amount,
-                    AmountCash = payment.AmountCash,
-                    AmountCredit = payment.AmountCredit,
-                    PaymentDate = payment.PaymentDate,
-                    Notes = payment.Notes
-                };
+                return MapPayment(payment);
             }
             catch
             {
@@ -450,6 +582,67 @@ namespace KMG.Core.Services
             }
         }
 
+        public async Task<List<ProjectPaymentDTO>> GetPendingChecksAsync()
+        {
+            var payments = await _unitOfWork.ProjectPayment
+                .GetQueryable(p => p.IsCheck && p.CheckStatus == Enums.CheckStatus.Pending)
+                .OrderBy(p => p.CheckDueDate)
+                .ToListAsync();
+
+            return payments.Select(MapPayment).ToList();
+        }
+
+        public async Task<ProjectPaymentDTO> ResolveCheckAsync(ResolveProjectPaymentCheckDTO model, int employeeId)
+        {
+            using var transaction = await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var payment = await _unitOfWork.ProjectPayment.GetQueryable(p => p.Id == model.PaymentId)
+                    .Include(p => p.Project)
+                    .FirstOrDefaultAsync() ?? throw new Exception("الدفعة غير موجودة");
+
+                if (!payment.IsCheck || payment.CheckStatus != Enums.CheckStatus.Pending)
+                    throw new Exception("الدفعة دي مش شيك معلّق");
+
+                switch (model.Action)
+                {
+                    case CheckResolutionAction.Clear:
+                        // الشيك بيتصرف عن طريق البنك، فقيمته بتتسجل على رصيد الكريديت مش الكاش
+                        await _cashBoxService.RecordTransactionAsync(
+                            amountCash: 0,
+                            amountCredit: payment.Amount,
+                            type: TransactionType.ProjectPaymentIn,
+                            description: $"تحصيل شيك من مشروع: {payment.Project.ProjectCode}",
+                            createdByEmployeeId: employeeId,
+                            projectId: payment.ProjectId,
+                            projectPaymentId: payment.Id);
+                        payment.CheckStatus = Enums.CheckStatus.Cleared;
+                        break;
+
+                    case CheckResolutionAction.Reschedule:
+                        if (model.NewDueDate == null)
+                            throw new Exception("لازم تحديد تاريخ استحقاق جديد");
+                        payment.CheckDueDate = model.NewDueDate;
+                        break;
+
+                    case CheckResolutionAction.Cancel:
+                        payment.CheckStatus = Enums.CheckStatus.Cancelled;
+                        break;
+                }
+
+                _unitOfWork.ProjectPayment.Update(payment);
+                await _unitOfWork.CompleteAsync();
+                await transaction.CommitAsync();
+
+                return MapPayment(payment);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task<ProjectExpenseDTO> RecordExpenseAsync(CreateProjectExpenseDTO model, int createdByEmployeeId)
         {
             using var transaction = await _unitOfWork.BeginTransactionAsync();
@@ -466,6 +659,7 @@ namespace KMG.Core.Services
                     Description = model.Description,
                     ExpenseDate = model.ExpenseDate,
                     AttachmentUrl = model.AttachmentUrl,
+                    AttachmentFileName = model.AttachmentFileName,
                     CreatedByEmployeeId = createdByEmployeeId
                 };
 
@@ -502,7 +696,8 @@ namespace KMG.Core.Services
                     Category = expense.Category.ToString(),
                     Description = expense.Description,
                     ExpenseDate = expense.ExpenseDate,
-                    AttachmentUrl = expense.AttachmentUrl
+                    AttachmentUrl = expense.AttachmentUrl,
+                    AttachmentFileName = expense.AttachmentFileName
                 };
             }
             catch
@@ -561,7 +756,8 @@ namespace KMG.Core.Services
                     Category = expense.Category.ToString(),
                     Description = expense.Description,
                     ExpenseDate = expense.ExpenseDate,
-                    AttachmentUrl = expense.AttachmentUrl
+                    AttachmentUrl = expense.AttachmentUrl,
+                    AttachmentFileName = expense.AttachmentFileName
                 };
             }
             catch
@@ -747,6 +943,21 @@ namespace KMG.Core.Services
             var countThisYear = (await _unitOfWork.Project.FindAllAsync(p => p.CreatedAt.Year == year)).Count();
             return $"KMG-{year}-{(countThisYear + 1):D4}";
         }
+
+        private static ProjectPaymentDTO MapPayment(ProjectPayment p) => new()
+        {
+            Id = p.Id,
+            Amount = p.Amount,
+            AmountCash = p.AmountCash,
+            AmountCredit = p.AmountCredit,
+            PaymentDate = p.PaymentDate,
+            Notes = p.Notes,
+            AttachmentUrl = p.AttachmentUrl,
+            AttachmentFileName = p.AttachmentFileName,
+            IsCheck = p.IsCheck,
+            CheckDueDate = p.CheckDueDate,
+            CheckStatus = p.CheckStatus?.ToString()
+        };
 
         private static ProjectListDTO MapList(Project p) => new()
         {

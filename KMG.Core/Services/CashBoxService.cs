@@ -44,7 +44,11 @@ namespace KMG.Core.Services
             int? advanceId = null,
             int? projectPaymentId = null,
             int? supplierPaymentId = null,
-            int? miscExpenseId = null)
+            int? miscExpenseId = null,
+            int? custodyId = null,
+            int? insurancePayoutId = null,
+            int? misrInsurancePayoutId = null,
+            int? stockMovementId = null)
         {
             var cashBox = await GetOrCreateCashBoxAsync();
 
@@ -69,6 +73,10 @@ namespace KMG.Core.Services
                 ProjectPaymentId = projectPaymentId,
                 SupplierPaymentId = supplierPaymentId,
                 MiscExpenseId = miscExpenseId,
+                CustodyId = custodyId,
+                InsurancePayoutId = insurancePayoutId,
+                MisrInsurancePayoutId = misrInsurancePayoutId,
+                StockMovementId = stockMovementId,
                 CreatedByEmployeeId = createdByEmployeeId
             };
 
@@ -88,7 +96,7 @@ namespace KMG.Core.Services
             _unitOfWork.CashBoxTransaction.DeleteRange(transactions);
         }
 
-        public async Task<PagedResultDTO<CashBoxTransactionDTO>> GetTransactionsAsync(CashBoxTransactionFilterDTO filter)
+        public async Task<CashBoxTransactionsResultDTO> GetTransactionsAsync(CashBoxTransactionFilterDTO filter)
         {
             var query = _unitOfWork.CashBoxTransaction.GetQueryable(null)
                 .Include(t => t.Project)
@@ -121,6 +129,10 @@ namespace KMG.Core.Services
             var page = Math.Max(filter.Page, 1);
             var pageSize = Math.Clamp(filter.PageSize, 1, 200);
 
+            // مجموع الكاش/الكريديت على كل النتائج المطابقة للفلتر - قبل الـ Skip/Take عشان يشمل كل الصفحات مش الحالية بس
+            var filteredTotalCash = await query.SumAsync(t => t.AmountCash);
+            var filteredTotalCredit = await query.SumAsync(t => t.AmountCredit);
+
             var transactions = await query
                 .OrderByDescending(t => t.TransactionDate)
                 .ThenByDescending(t => t.Id)
@@ -128,26 +140,31 @@ namespace KMG.Core.Services
                 .Take(pageSize)
                 .ToListAsync();
 
-            return new PagedResultDTO<CashBoxTransactionDTO>
+            return new CashBoxTransactionsResultDTO
             {
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize,
-                Items = transactions.Select(MapTransaction).ToList()
+                Items = transactions.Select(MapTransaction).ToList(),
+                FilteredTotalCash = filteredTotalCash,
+                FilteredTotalCredit = filteredTotalCredit
             };
         }
 
         public async Task<MiscExpenseDTO> CreateMiscExpenseAsync(CreateMiscExpenseDTO model, int createdByEmployeeId)
         {
-            if (model.Amount <= 0)
+            if (model.AmountCash + model.AmountCredit <= 0)
                 throw new Exception("قيمة المصروف يجب أن تكون أكبر من صفر");
 
             var expense = new MiscExpense
             {
-                Amount = model.Amount,
+                AmountCash = model.AmountCash,
+                AmountCredit = model.AmountCredit,
                 Notes = model.Notes,
                 Category = model.Category,
                 ExpenseDate = model.ExpenseDate,
+                AttachmentUrl = model.AttachmentUrl,
+                AttachmentFileName = model.AttachmentFileName,
                 CreatedByEmployeeId = createdByEmployeeId
             };
 
@@ -155,8 +172,8 @@ namespace KMG.Core.Services
             await _unitOfWork.CompleteAsync(); // نحتاج expense.Id عشان نربط بيه حركة الخزنة
 
             await RecordTransactionAsync(
-                amountCash: -model.Amount,
-                amountCredit: 0,
+                amountCash: -model.AmountCash,
+                amountCredit: -model.AmountCredit,
                 type: TransactionType.MiscExpenseOut,
                 description: $"مصروف نثري ({CategoryLabel(model.Category)}): {model.Notes}",
                 createdByEmployeeId: createdByEmployeeId,
@@ -170,7 +187,7 @@ namespace KMG.Core.Services
 
         public async Task<MiscExpenseDTO> UpdateMiscExpenseAsync(UpdateMiscExpenseDTO model, int employeeId)
         {
-            if (model.Amount <= 0)
+            if (model.AmountCash + model.AmountCredit <= 0)
                 throw new Exception("قيمة المصروف يجب أن تكون أكبر من صفر");
 
             var expense = await _unitOfWork.MiscExpense.GetQueryable(e => e.Id == model.Id)
@@ -179,15 +196,18 @@ namespace KMG.Core.Services
 
             await ReverseAsync(t => t.MiscExpenseId == expense.Id);
 
-            expense.Amount = model.Amount;
+            expense.AmountCash = model.AmountCash;
+            expense.AmountCredit = model.AmountCredit;
             expense.Notes = model.Notes;
             expense.Category = model.Category;
             expense.ExpenseDate = model.ExpenseDate;
+            expense.AttachmentUrl = model.AttachmentUrl;
+            expense.AttachmentFileName = model.AttachmentFileName;
             _unitOfWork.MiscExpense.Update(expense);
 
             await RecordTransactionAsync(
-                amountCash: -model.Amount,
-                amountCredit: 0,
+                amountCash: -model.AmountCash,
+                amountCredit: -model.AmountCredit,
                 type: TransactionType.MiscExpenseOut,
                 description: $"تعديل مصروف نثري ({CategoryLabel(model.Category)}): {model.Notes}",
                 createdByEmployeeId: employeeId,
@@ -210,6 +230,30 @@ namespace KMG.Core.Services
             return true;
         }
 
+        public async Task<CashBoxDetailsDTO> AdjustBalanceAsync(AdjustCashBoxDTO model, int employeeId)
+        {
+            var cashBox = await GetOrCreateCashBoxAsync();
+            var deltaCash = model.NewTotalCash - cashBox.TotalCash;
+            var deltaCredit = model.NewTotalCredit - cashBox.TotalCredit;
+
+            if (deltaCash == 0 && deltaCredit == 0)
+                throw new Exception("لم يتم إدخال أي تغيير في رصيد الخزنة");
+
+            var description = $"تعديل يدوي لرصيد الخزنة: أصبح الكاش {model.NewTotalCash:N2} والكريديت {model.NewTotalCredit:N2}"
+                + (string.IsNullOrWhiteSpace(model.Reason) ? "" : $" - السبب: {model.Reason}");
+
+            await RecordTransactionAsync(
+                amountCash: deltaCash,
+                amountCredit: deltaCredit,
+                type: TransactionType.ManualAdjustment,
+                description: description,
+                createdByEmployeeId: employeeId);
+
+            await _unitOfWork.CompleteAsync();
+
+            return await GetDetailsAsync();
+        }
+
         private static string CategoryLabel(Enums.MiscExpenseCategory category) => category switch
         {
             Enums.MiscExpenseCategory.Administrative => "إداري",
@@ -221,10 +265,14 @@ namespace KMG.Core.Services
         {
             Id = e.Id,
             Amount = e.Amount,
+            AmountCash = e.AmountCash,
+            AmountCredit = e.AmountCredit,
             Notes = e.Notes,
             Category = e.Category.ToString(),
             ExpenseDate = e.ExpenseDate,
-            CreatedByEmployeeName = employeeName
+            CreatedByEmployeeName = employeeName,
+            AttachmentUrl = e.AttachmentUrl,
+            AttachmentFileName = e.AttachmentFileName
         };
 
         private static CashBoxTransactionDTO MapTransaction(CashBoxTransaction t) => new()
@@ -242,7 +290,9 @@ namespace KMG.Core.Services
             MiscExpenseId = t.MiscExpenseId,
             MiscExpenseNotes = t.MiscExpense?.Notes,
             MiscExpenseCategory = t.MiscExpense?.Category.ToString(),
-            MiscExpenseDate = t.MiscExpense?.ExpenseDate
+            MiscExpenseDate = t.MiscExpense?.ExpenseDate,
+            MiscExpenseAttachmentUrl = t.MiscExpense?.AttachmentUrl,
+            MiscExpenseAttachmentFileName = t.MiscExpense?.AttachmentFileName
         };
 
         public async Task<CashBoxDetailsDTO> GetDetailsAsync(int recentCount = 50)

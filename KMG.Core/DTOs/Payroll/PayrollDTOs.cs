@@ -41,6 +41,8 @@ namespace KMG.Core.DTOs.Payroll
         public string Reason { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public bool Applied { get; set; }
+        public decimal? Hours { get; set; }
+        public decimal? HourlyRate { get; set; }
     }
 
     public class CreateAdjustmentDTO
@@ -50,6 +52,8 @@ namespace KMG.Core.DTOs.Payroll
         public decimal Amount { get; set; }
         public string Reason { get; set; } = string.Empty;
         public DateTime Date { get; set; }
+        public decimal? Hours { get; set; }
+        public decimal? HourlyRate { get; set; }
     }
 
     public class UpdateAdjustmentDTO
@@ -59,6 +63,8 @@ namespace KMG.Core.DTOs.Payroll
         public decimal Amount { get; set; }
         public string Reason { get; set; } = string.Empty;
         public DateTime Date { get; set; }
+        public decimal? Hours { get; set; }
+        public decimal? HourlyRate { get; set; }
     }
 
     public class PayrollPreviewDTO
@@ -72,7 +78,15 @@ namespace KMG.Core.DTOs.Payroll
         public decimal DeductionsAmount { get; set; }
         public decimal BonusAmount { get; set; }
         public decimal AdvanceInstallmentAmount { get; set; }
+        public decimal InsuranceAmount { get; set; }
+        public decimal MisrInsuranceAmount { get; set; }
         public decimal NetPaid { get; set; }
+        public decimal WorkshopDays { get; set; }
+        public decimal MissionDays { get; set; }
+        /// <summary>أيام الجمعة اللي اتشالت من حساب يومية العامل اليومي (إجازة) - للعرض بس، مش بتتخزن</summary>
+        public decimal ExcludedFridays { get; set; }
+        public decimal HourlyDeductionAmount { get; set; }
+        public decimal HourlyBonusAmount { get; set; }
     }
 
     public class RunPayrollDTO
@@ -86,5 +100,17 @@ namespace KMG.Core.DTOs.Payroll
     {
         public int Id { get; set; }
         public DateTime PaidDate { get; set; }
+    }
+
+    public class UpdatePayrollPayoutDTO
+    {
+        public int Id { get; set; }
+        public decimal BaseAmount { get; set; }
+        public decimal MissionDoubleUpAmount { get; set; }
+        public decimal DeductionsAmount { get; set; }
+        public decimal BonusAmount { get; set; }
+        public decimal AdvanceInstallmentAmount { get; set; }
+        public decimal InsuranceAmount { get; set; }
+        public decimal MisrInsuranceAmount { get; set; }
     }
 }

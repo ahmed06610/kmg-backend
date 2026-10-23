@@ -17,9 +17,9 @@ namespace KMG.Api.Controllers
 
         [HttpGet]
         [AuthorizeAbility("عرض لوحة التحكم")]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromQuery] DateTime? from, [FromQuery] DateTime? to)
         {
-            return Ok(await _dashboardService.GetDashboardAsync());
+            return Ok(await _dashboardService.GetDashboardAsync(from, to));
         }
     }
 }

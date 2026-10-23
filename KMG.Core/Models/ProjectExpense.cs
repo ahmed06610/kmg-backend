@@ -10,6 +10,7 @@ namespace KMG.Core.Models
         public string? Description { get; set; }
         public DateTime ExpenseDate { get; set; }
         public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
 
         public int ProjectId { get; set; }
         public virtual Project Project { get; set; } = null!;

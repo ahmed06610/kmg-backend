@@ -26,13 +26,15 @@ namespace KMG.Core.DTOs.Mission
     {
         public int EmployeeId { get; set; }
         public string EmployeeName { get; set; } = string.Empty;
-        public int DaysCount { get; set; }
+        public decimal DaysCount { get; set; }
+        public decimal DailyRate { get; set; }
     }
 
     public class MissionWorkerInputDTO
     {
         public int EmployeeId { get; set; }
-        public int DaysCount { get; set; }
+        public decimal DaysCount { get; set; }
+        public decimal DailyRate { get; set; }
     }
 
     public class CreateMissionDTO
@@ -60,5 +62,6 @@ namespace KMG.Core.DTOs.Mission
         public DateTime StartDate { get; set; }
         public decimal AdvanceAmount { get; set; }
         public string? Notes { get; set; }
+        public List<MissionWorkerInputDTO> Workers { get; set; } = new();
     }
 }

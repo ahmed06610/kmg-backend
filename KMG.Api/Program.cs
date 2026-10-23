@@ -50,6 +50,13 @@ builder.Services.AddScoped<IPayrollService, PayrollService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAiContextService, AiContextService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<ICustodyService, CustodyService>();
+builder.Services.AddScoped<IInsuranceService, InsuranceService>();
+builder.Services.AddScoped<IMisrInsuranceService, MisrInsuranceService>();
+builder.Services.AddScoped<IAiChatService, AiChatService>();
+// الاتصال بخدمة محادثة الـ AI الخارجية - الـ Timeout بيتحكم فيه الـ Client نفسه من الإعدادات (ChatTimeoutSeconds)
+builder.Services.AddHttpClient<IAiChatClient, KMG.Api.Helper.HttpAiChatClient>(client => client.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 
 builder.Services.Configure<JWT>(builder.Configuration.GetSection("JWT"));

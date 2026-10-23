@@ -74,6 +74,7 @@ namespace KMG.Core.DTOs.Stock
         public string MaterialName { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
         public decimal UnitPriceAtTime { get; set; }
+        public decimal TransportCost { get; set; }
         public int? ProjectId { get; set; }
         public string? ProjectCode { get; set; }
         public string? ProjectName { get; set; }
@@ -82,6 +83,8 @@ namespace KMG.Core.DTOs.Stock
         public DateTime MovementDate { get; set; }
         public string? Notes { get; set; }
         public string CreatedByEmployeeName { get; set; } = string.Empty;
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class CreatePurchaseDTO
@@ -89,16 +92,34 @@ namespace KMG.Core.DTOs.Stock
         public int MaterialId { get; set; }
         public decimal Quantity { get; set; }
         public decimal UnitPrice { get; set; }
+        public decimal TransportCost { get; set; }
         public int SupplierId { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
+    }
+
+    public class UpdatePurchaseDTO
+    {
+        public int Id { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TransportCost { get; set; }
+        public int SupplierId { get; set; }
+        public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class CreateIssueDTO
     {
         public int MaterialId { get; set; }
         public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
         public int ProjectId { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class CreateReturnDTO
@@ -107,5 +128,53 @@ namespace KMG.Core.DTOs.Stock
         public decimal Quantity { get; set; }
         public int ProjectId { get; set; }
         public string? Notes { get; set; }
+    }
+
+    public class StockPriceBatchDTO
+    {
+        public decimal UnitPrice { get; set; }
+        public decimal AvailableQuantity { get; set; }
+        public DateTime FirstPurchaseDate { get; set; }
+    }
+
+    /// <summary>
+    /// تعديل حركة مخزون متسجلة (صرف/مرتجع/رصيد افتتاحي/تسوية جرد) - الشراء ليه UpdatePurchaseDTO لوحده
+    /// عشان مربوط بمورد ومصروف نقل. الحقول اللي مش منطقية لنوع الحركة بتتجاهل.
+    /// </summary>
+    public class UpdateStockMovementDTO
+    {
+        public int Id { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }      // للصرف/الرصيد الافتتاحي فقط
+        public int? ProjectId { get; set; }          // للصرف/المرتجع فقط
+        public string? Notes { get; set; }
+        public DateTime? MovementDate { get; set; }
+    }
+
+    /// <summary>تسوية جرد: بيحدد الكمية الفعلية الموجودة في المخزن، والفرق بيتسجل كحركة "تسوية جرد"</summary>
+    public class CreateStockAdjustmentDTO
+    {
+        public int MaterialId { get; set; }
+        public decimal ActualQuantity { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    /// <summary>دمج خامة اتسجلت بالغلط (مكررة) في خامة تانية: كل حركاتها بتتنقل للخامة الهدف والخامة الأصلية بتتمسح</summary>
+    public class MergeMaterialsDTO
+    {
+        public int SourceMaterialId { get; set; }
+        public int TargetMaterialId { get; set; }
+    }
+
+    /// <summary>ملخص أثر حذف خامة - بيتعرض للمستخدم قبل التأكيد عشان يعرف هيتمسح إيه بالظبط</summary>
+    public class MaterialDeleteImpactDTO
+    {
+        public int MovementsCount { get; set; }
+        public int PurchasesCount { get; set; }
+        public int IssuesCount { get; set; }
+        public int ReturnsCount { get; set; }
+        public List<string> AffectedProjects { get; set; } = new();
+        public List<string> AffectedSuppliers { get; set; } = new();
+        public decimal TransportCostToReverse { get; set; }
     }
 }

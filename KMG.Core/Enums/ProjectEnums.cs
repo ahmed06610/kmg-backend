@@ -21,10 +21,11 @@ namespace KMG.Core.Enums
     public enum ExpenseCategory
     {
         TenderInsurance = 1,      // تأمين المناقصة
-        TenderTax = 2,             // ضريبة المناقصة
+        TenderTax = 2,             // ضريبة المناقصة (تاريخيًا فقط - مش بتتسجل كمصروف جديد بعد كده)
         Procedural = 3,            // دفعات إجرائية
         MissionSettlementDiff = 4, // فرق تسوية عهدة مأمورية
         Breakdown = 5,             // عطل
-        Other = 6
+        Other = 6,
+        WorkGuarantee = 7          // ضمان الأعمال
     }
 }

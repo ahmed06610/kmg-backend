@@ -43,6 +43,18 @@ namespace KMG.Core.Models
         public int? MiscExpenseId { get; set; }
         public virtual MiscExpense? MiscExpense { get; set; }
 
+        public int? CustodyId { get; set; }
+        public virtual Custody? Custody { get; set; }
+
+        public int? InsurancePayoutId { get; set; }
+        public virtual InsurancePayout? InsurancePayout { get; set; }
+
+        public int? MisrInsurancePayoutId { get; set; }
+        public virtual MisrInsurancePayout? MisrInsurancePayout { get; set; }
+
+        public int? StockMovementId { get; set; }
+        public virtual StockMovement? StockMovement { get; set; }
+
         public int CreatedByEmployeeId { get; set; }
         public virtual Employee CreatedByEmployee { get; set; } = null!;
     }

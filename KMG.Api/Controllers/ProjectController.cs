@@ -73,6 +73,36 @@ namespace KMG.Api.Controllers
             return result ? Ok() : NotFound();
         }
 
+        [HttpPost("{id}/recover-insurance")]
+        [AuthorizeAbility("إدارة المشاريع")]
+        public async Task<IActionResult> RecoverInsurance(int id)
+        {
+            try
+            {
+                var result = await _projectService.RecoverInsuranceAsync(id, CurrentEmployeeId);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{id}/recover-guarantee")]
+        [AuthorizeAbility("إدارة المشاريع")]
+        public async Task<IActionResult> RecoverGuarantee(int id)
+        {
+            try
+            {
+                var result = await _projectService.RecoverGuaranteeAsync(id, CurrentEmployeeId);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("payments")]
         [AuthorizeAbility("إدارة المشاريع")]
         public async Task<IActionResult> RecordPayment([FromBody] CreateProjectPaymentDTO model)
@@ -109,6 +139,27 @@ namespace KMG.Api.Controllers
             {
                 var result = await _projectService.DeletePaymentAsync(id, CurrentEmployeeId);
                 return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("payments/pending-checks")]
+        [AuthorizeAbility("إدارة المشاريع")]
+        public async Task<IActionResult> GetPendingChecks()
+        {
+            return Ok(await _projectService.GetPendingChecksAsync());
+        }
+
+        [HttpPost("payments/resolve-check")]
+        [AuthorizeAbility("إدارة المشاريع")]
+        public async Task<IActionResult> ResolveCheck([FromBody] ResolveProjectPaymentCheckDTO model)
+        {
+            try
+            {
+                return Ok(await _projectService.ResolveCheckAsync(model, CurrentEmployeeId));
             }
             catch (Exception ex)
             {

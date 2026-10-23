@@ -10,10 +10,14 @@ namespace KMG.Core.Interfaces.Services
         Task<bool> UpdateAsync(UpdateProjectDTO model, int employeeId);
         Task<bool> DeleteAsync(int id);
         Task<bool> UpdateStatusAsync(UpdateProjectStatusDTO model, int employeeId);
+        Task<bool> RecoverInsuranceAsync(int projectId, int employeeId);
+        Task<bool> RecoverGuaranteeAsync(int projectId, int employeeId);
 
         Task<ProjectPaymentDTO> RecordPaymentAsync(CreateProjectPaymentDTO model, int createdByEmployeeId);
         Task<ProjectPaymentDTO> UpdatePaymentAsync(UpdateProjectPaymentDTO model, int employeeId);
         Task<bool> DeletePaymentAsync(int id, int employeeId);
+        Task<List<ProjectPaymentDTO>> GetPendingChecksAsync();
+        Task<ProjectPaymentDTO> ResolveCheckAsync(ResolveProjectPaymentCheckDTO model, int employeeId);
 
         Task<ProjectExpenseDTO> RecordExpenseAsync(CreateProjectExpenseDTO model, int createdByEmployeeId);
         Task<ProjectExpenseDTO> UpdateExpenseAsync(UpdateProjectExpenseDTO model, int employeeId);

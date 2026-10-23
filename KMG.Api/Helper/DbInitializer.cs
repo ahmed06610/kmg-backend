@@ -24,7 +24,8 @@ namespace KMG.Api.Helper
             "إدارة الرواتب",
             "عرض الخزنة",
             "عرض لوحة التحكم",
-            "إدارة تكامل AI"
+            "إدارة تكامل AI",
+            "إدارة الفواتير"
         };
 
         public static async Task SeedAsync(IServiceProvider services)
@@ -39,6 +40,30 @@ namespace KMG.Api.Helper
             await SeedRoleAbilitiesAsync(context, roleManager);
             await SeedOwnerAsync(context, userManager, roleManager, unitOfWork);
             await SyncOwnerAbilitiesAsync(context, userManager, roleManager);
+            await ReverseLegacyTransportCostTransactionsAsync(context);
+        }
+
+        // تصحيح بيانات لمرة واحدة: مصروف النقل كان بيتخصم من الخزنة وقت الشراء، وفي نفس الوقت بيتضاف على
+        // مستحق المورد - فكان بيتدفع مرتين لما المورد ياخد مستحقه. دلوقتي النقل جزء من المستحق للمورد بس
+        // وبيتخصم من الخزنة مع دفعة المورد، فالحركات القديمة دي بتتلغي ورصيد الخزنة بيرجعله قيمتها (نفس منطق
+        // CashBoxService.ReverseAsync). آمن يتنفذ كل تشغيل: بعد أول مرة مفيش حركات من النوع ده تتلغي.
+        private static async Task ReverseLegacyTransportCostTransactionsAsync(ApplicationDbContext context)
+        {
+            var legacy = await context.CashBoxTransactions
+                .Where(t => t.TransactionType == Core.Enums.TransactionType.TransportCostOut)
+                .ToListAsync();
+            if (legacy.Count == 0) return;
+
+            foreach (var group in legacy.GroupBy(t => t.CashBoxId))
+            {
+                var cashBox = await context.CashBoxes.FindAsync(group.Key);
+                if (cashBox == null) continue;
+                cashBox.TotalCash -= group.Sum(t => t.AmountCash);
+                cashBox.TotalCredit -= group.Sum(t => t.AmountCredit);
+            }
+
+            context.CashBoxTransactions.RemoveRange(legacy);
+            await context.SaveChangesAsync();
         }
 
         // الـ JWT بياخد صلاحيات المستخدم من UserAbilities المباشرة بس (مش من الدور)،

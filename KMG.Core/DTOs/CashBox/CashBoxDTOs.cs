@@ -27,6 +27,8 @@ namespace KMG.Core.DTOs.CashBox
         public string? MiscExpenseNotes { get; set; }
         public string? MiscExpenseCategory { get; set; }
         public DateTime? MiscExpenseDate { get; set; }
+        public string? MiscExpenseAttachmentUrl { get; set; }
+        public string? MiscExpenseAttachmentFileName { get; set; }
     }
 
     public class PagedResultDTO<T>
@@ -35,6 +37,13 @@ namespace KMG.Core.DTOs.CashBox
         public int TotalCount { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }
+    }
+
+    public class CashBoxTransactionsResultDTO : PagedResultDTO<CashBoxTransactionDTO>
+    {
+        /// <summary>مجموع الكاش/الكريديت على كل النتائج المطابقة للفلتر (مش الصفحة الحالية بس)</summary>
+        public decimal FilteredTotalCash { get; set; }
+        public decimal FilteredTotalCredit { get; set; }
     }
 
     public class CashBoxTransactionFilterDTO
@@ -53,26 +62,43 @@ namespace KMG.Core.DTOs.CashBox
     {
         public int Id { get; set; }
         public decimal Amount { get; set; }
+        public decimal AmountCash { get; set; }
+        public decimal AmountCredit { get; set; }
         public string? Notes { get; set; }
         public string Category { get; set; } = string.Empty;
         public DateTime ExpenseDate { get; set; }
         public string CreatedByEmployeeName { get; set; } = string.Empty;
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class CreateMiscExpenseDTO
     {
-        public decimal Amount { get; set; }
+        public decimal AmountCash { get; set; }
+        public decimal AmountCredit { get; set; }
         public string? Notes { get; set; }
         public MiscExpenseCategory Category { get; set; }
         public DateTime ExpenseDate { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class UpdateMiscExpenseDTO
     {
         public int Id { get; set; }
-        public decimal Amount { get; set; }
+        public decimal AmountCash { get; set; }
+        public decimal AmountCredit { get; set; }
         public string? Notes { get; set; }
         public MiscExpenseCategory Category { get; set; }
         public DateTime ExpenseDate { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
+    }
+
+    public class AdjustCashBoxDTO
+    {
+        public decimal NewTotalCash { get; set; }
+        public decimal NewTotalCredit { get; set; }
+        public string? Reason { get; set; }
     }
 }

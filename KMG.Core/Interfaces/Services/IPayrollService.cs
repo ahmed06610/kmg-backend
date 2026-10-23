@@ -17,5 +17,7 @@ namespace KMG.Core.Interfaces.Services
         Task<PayrollPreviewDTO> PreviewPayrollAsync(RunPayrollDTO model);
         Task<PayrollPayoutDTO> RunPayrollAsync(RunPayrollDTO model, int createdByEmployeeId);
         Task<List<PayrollPayoutDTO>> GetPayoutHistoryAsync(int? employeeId = null);
+        Task<PayrollPayoutDTO> UpdatePayrollPayoutAsync(UpdatePayrollPayoutDTO model, int employeeId);
+        Task<bool> DeletePayrollPayoutAsync(int id);
     }
 }

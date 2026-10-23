@@ -24,15 +24,30 @@ namespace KMG.Core.DTOs.Project
         public string? ClientEmail { get; set; }
         public string? ClientAddress { get; set; }
         public string? Description { get; set; }
-        public decimal? TenderInsuranceAmount { get; set; }
-        public decimal? TenderTaxAmount { get; set; }
+        public decimal? TenderInsurancePercent { get; set; }
+        public decimal TenderInsuranceAmount { get; set; }
+        public DateTime? InsuranceDueDate { get; set; }
+        public bool InsuranceRecovered { get; set; }
+        public decimal? TenderTaxPercent { get; set; }
+        public decimal TenderTaxAmount { get; set; }
+        public decimal? WorkGuaranteePercent { get; set; }
+        public decimal WorkGuaranteeAmount { get; set; }
+        public DateTime? WorkGuaranteeDueDate { get; set; }
+        public bool WorkGuaranteeRecovered { get; set; }
+        public decimal ContractValueWithTax { get; set; }
+        public decimal EffectiveContractValue { get; set; }
         public decimal? SupplyProfitMargin { get; set; }
         public decimal TotalMaterialsCost { get; set; }
         public decimal TotalPettyExpenses { get; set; }
         public decimal TotalLaborCost { get; set; }
         public decimal TotalWriteOffs { get; set; }
+        public decimal TotalMissionCustodyCost { get; set; }
+        public decimal TotalSideCustodyCost { get; set; }
+        public decimal TotalCustodyCost { get; set; }
+        public decimal TotalCost { get; set; }
 
         public List<ProjectPaymentDTO> Payments { get; set; } = new();
+        public List<CashBox.CustodyDTO> Custodies { get; set; } = new();
         public List<ProjectExpenseDTO> Expenses { get; set; } = new();
         public List<Stock.StockMovementDTO> StockMovements { get; set; } = new();
         public List<ProjectAttachmentDTO> Attachments { get; set; } = new();
@@ -73,6 +88,11 @@ namespace KMG.Core.DTOs.Project
         public decimal AmountCredit { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
+        public bool IsCheck { get; set; }
+        public DateTime? CheckDueDate { get; set; }
+        public string? CheckStatus { get; set; }
     }
 
     public class ProjectExpenseDTO
@@ -83,6 +103,7 @@ namespace KMG.Core.DTOs.Project
         public string? Description { get; set; }
         public DateTime ExpenseDate { get; set; }
         public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class ProjectAttachmentDTO
@@ -110,8 +131,11 @@ namespace KMG.Core.DTOs.Project
         public int ClientId { get; set; }
         public decimal ContractValue { get; set; }
         public string? Description { get; set; }
-        public decimal? TenderInsuranceAmount { get; set; }
-        public decimal? TenderTaxAmount { get; set; }
+        public decimal? TenderInsurancePercent { get; set; }
+        public DateTime? InsuranceDueDate { get; set; }
+        public decimal? TenderTaxPercent { get; set; }
+        public decimal? WorkGuaranteePercent { get; set; }
+        public DateTime? WorkGuaranteeDueDate { get; set; }
         public decimal? SupplyProfitMargin { get; set; }
     }
 
@@ -122,6 +146,11 @@ namespace KMG.Core.DTOs.Project
         public string? Description { get; set; }
         public int ClientId { get; set; }
         public decimal ContractValue { get; set; }
+        public decimal? TenderInsurancePercent { get; set; }
+        public DateTime? InsuranceDueDate { get; set; }
+        public decimal? TenderTaxPercent { get; set; }
+        public decimal? WorkGuaranteePercent { get; set; }
+        public DateTime? WorkGuaranteeDueDate { get; set; }
     }
 
     public class UpdateProjectStatusDTO
@@ -137,6 +166,10 @@ namespace KMG.Core.DTOs.Project
         public decimal AmountCredit { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
+        public bool IsCheck { get; set; }
+        public DateTime? CheckDueDate { get; set; }
     }
 
     public class UpdateProjectPaymentDTO
@@ -146,6 +179,17 @@ namespace KMG.Core.DTOs.Project
         public decimal AmountCredit { get; set; }
         public DateTime PaymentDate { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
+        public bool IsCheck { get; set; }
+        public DateTime? CheckDueDate { get; set; }
+    }
+
+    public class ResolveProjectPaymentCheckDTO
+    {
+        public int PaymentId { get; set; }
+        public CheckResolutionAction Action { get; set; }
+        public DateTime? NewDueDate { get; set; }
     }
 
     public class CreateProjectExpenseDTO
@@ -156,6 +200,7 @@ namespace KMG.Core.DTOs.Project
         public string? Description { get; set; }
         public DateTime ExpenseDate { get; set; }
         public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
         public bool PaidFromCashBox { get; set; } = true;
     }
 

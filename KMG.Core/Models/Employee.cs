@@ -10,6 +10,8 @@ namespace KMG.Core.Models
         public EmployeeType EmployeeType { get; set; }
         public WageType WageType { get; set; }
         public decimal WageAmount { get; set; } // راتب شهري ثابت أو يومية العامل
+        public decimal InsuranceAmount { get; set; } // قيمة التأمين الاجتماعي الشهرية للموظف
+        public decimal MisrInsuranceAmount { get; set; } // قيمة تأمين "مصر للتأمين" الشهرية للموظف - نوع تأمين منفصل تمامًا عن الاجتماعي
         public bool Suspended { get; set; }
         public DateTime CreatedAt { get; set; }
 

@@ -107,15 +107,15 @@ namespace KMG.Api.Helper
                 ClientId = client1Id,
                 ContractValue = 500000,
                 Description = "واجهة كلادينج - فرع جديد",
-                TenderInsuranceAmount = 5000,
-                TenderTaxAmount = 2000
+                TenderInsurancePercent = 1,   // 1% من 500,000 = 5,000
+                TenderTaxPercent = 0.4m       // 0.4% من 500,000 = 2,000 (رقم عرض بس، من غير أثر في الخزنة)
             }, ownerId);
 
-            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mAlucobond, Quantity = 150, ProjectId = project1Id, Notes = "صرف للتصنيع" }, ownerId);
-            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mProfile, Quantity = 200, ProjectId = project1Id, Notes = "صرف للتصنيع" }, ownerId);
+            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mAlucobond, Quantity = 150, UnitPrice = 300, ProjectId = project1Id, Notes = "صرف للتصنيع" }, ownerId);
+            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mProfile, Quantity = 200, UnitPrice = 80, ProjectId = project1Id, Notes = "صرف للتصنيع" }, ownerId);
 
-            // ملحوظة: تأمين وضريبة المناقصة (5000 + 2000) اتسجلوا تلقائيًا كمصروف نثري وحركة خزنة
-            // وقت إنشاء المشروع نفسه (TenderInsuranceAmount/TenderTaxAmount في CreateProjectDTO فوق)
+            // ملحوظة: تأمين المناقصة (5,000) اتسجل تلقائيًا كمصروف نثري وحركة خزنة وقت إنشاء
+            // المشروع نفسه (TenderInsurancePercent في CreateProjectDTO فوق) - الضريبة مالهاش أثر في الخزنة
             await projectService.RecordExpenseAsync(new CreateProjectExpenseDTO
             { ProjectId = project1Id, Amount = 1500, Category = ExpenseCategory.Procedural, Description = "دفعة إجرائية", ExpenseDate = DateTime.UtcNow.AddDays(-15) }, ownerId);
 
@@ -151,8 +151,8 @@ namespace KMG.Api.Helper
                 Description = "لافتة محطة وقود + كلادينج المدخل"
             }, ownerId);
 
-            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mGlass, Quantity = 15, ProjectId = project2Id, Notes = "صرف للتركيب" }, ownerId);
-            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mScrews, Quantity = 10, ProjectId = project2Id, Notes = "صرف للتركيب" }, ownerId);
+            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mGlass, Quantity = 15, UnitPrice = 450, ProjectId = project2Id, Notes = "صرف للتركيب" }, ownerId);
+            await stockService.IssueToProjectAsync(new CreateIssueDTO { MaterialId = mScrews, Quantity = 10, UnitPrice = 25, ProjectId = project2Id, Notes = "صرف للتركيب" }, ownerId);
 
             await projectService.RecordExpenseAsync(new CreateProjectExpenseDTO
             { ProjectId = project2Id, Amount = 800, Category = ExpenseCategory.Breakdown, Description = "عطل عربية النقل", ExpenseDate = DateTime.UtcNow.AddDays(-5) }, ownerId);

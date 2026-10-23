@@ -26,8 +26,8 @@ namespace KMG.Core.Models
         [NotMapped]
         public decimal SettlementDifference => AdvanceAmount - ActualSpent;
 
-        // تكلفة عمالة المأمورية = مضاعف يومية كل عامل × عدد أيامه في المأمورية دي
+        // تكلفة عمالة المأمورية = الأجر اليومي اللي المستخدم حدده لكل عامل × عدد أيامه في المأمورية دي
         [NotMapped]
-        public decimal TotalLaborCost => MissionWorkers.Sum(w => w.DaysCount * 2 * w.Employee.WageAmount);
+        public decimal TotalLaborCost => MissionWorkers.Sum(w => w.DaysCount * w.DailyRate);
     }
 }

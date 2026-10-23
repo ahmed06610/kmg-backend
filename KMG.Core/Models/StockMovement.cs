@@ -8,8 +8,15 @@ namespace KMG.Core.Models
         public MovementType MovementType { get; set; }
         public decimal Quantity { get; set; }
         public decimal UnitPriceAtTime { get; set; }
+
+        // تكلفة نقل إضافية مرتبطة بعملية شراء معينة - بتتضاف لحساب المستحق للمورد عن الحركة دي
+        // (مينفعش غير 0 إلا في حركات الشراء فقط)
+        public decimal TransportCost { get; set; }
+
         public DateTime MovementDate { get; set; }
         public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
 
         public int MaterialId { get; set; }
         public virtual Material Material { get; set; } = null!;

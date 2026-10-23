@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using KMG.Core.Enums;
 
 namespace KMG.Core.Models
@@ -9,10 +10,17 @@ namespace KMG.Core.Models
     public class MiscExpense
     {
         public int Id { get; set; }
-        public decimal Amount { get; set; }
+        public decimal AmountCash { get; set; }
+        public decimal AmountCredit { get; set; }
+
+        [NotMapped]
+        public decimal Amount => AmountCash + AmountCredit;
+
         public string? Notes { get; set; }
         public MiscExpenseCategory Category { get; set; }
         public DateTime ExpenseDate { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
 
         public int CreatedByEmployeeId { get; set; }
         public virtual Employee CreatedByEmployee { get; set; } = null!;

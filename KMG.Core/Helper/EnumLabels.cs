@@ -25,6 +25,7 @@ namespace KMG.Core.Helper
             [ExpenseCategory.MissionSettlementDiff] = "فرق تسوية عهدة",
             [ExpenseCategory.Breakdown] = "عطل",
             [ExpenseCategory.Other] = "أخرى",
+            [ExpenseCategory.WorkGuarantee] = "ضمان أعمال",
         };
 
         public static string Arabic(this ProjectStatus status) => ProjectStatusLabels.GetValueOrDefault(status, status.ToString());

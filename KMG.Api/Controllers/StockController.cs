@@ -34,6 +34,13 @@ namespace KMG.Api.Controllers
             return material == null ? NotFound() : Ok(material);
         }
 
+        [HttpGet("materials/{id}/price-batches")]
+        [AuthorizeAbility("عرض المخزن")]
+        public async Task<IActionResult> GetPriceBatches(int id)
+        {
+            return Ok(await _stockService.GetPriceBatchesAsync(id));
+        }
+
         [HttpPost("materials")]
         [AuthorizeAbility("إدارة المخزن")]
         public async Task<IActionResult> CreateMaterial([FromBody] CreateMaterialDTO model)
@@ -50,13 +57,78 @@ namespace KMG.Api.Controllers
             return result ? Ok() : NotFound();
         }
 
+        [HttpGet("materials/{id}/delete-impact")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> GetDeleteImpact(int id)
+        {
+            var impact = await _stockService.GetDeleteImpactAsync(id);
+            return impact == null ? NotFound() : Ok(impact);
+        }
+
         [HttpDelete("materials/{id}")]
         [AuthorizeAbility("إدارة المخزن")]
-        public async Task<IActionResult> DeleteMaterial(int id)
+        public async Task<IActionResult> DeleteMaterial(int id, [FromQuery] bool force = false)
         {
             try
             {
-                var result = await _stockService.DeleteMaterialAsync(id);
+                var result = await _stockService.DeleteMaterialAsync(id, force, CurrentEmployeeId);
+                return result ? Ok() : NotFound();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("materials/merge")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> MergeMaterials([FromBody] MergeMaterialsDTO model)
+        {
+            try
+            {
+                return Ok(await _stockService.MergeMaterialsAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("adjustment")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> CreateAdjustment([FromBody] CreateStockAdjustmentDTO model)
+        {
+            try
+            {
+                return Ok(await _stockService.CreateAdjustmentAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("movements")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> UpdateMovement([FromBody] UpdateStockMovementDTO model)
+        {
+            try
+            {
+                return Ok(await _stockService.UpdateMovementAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("movements/{id}")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> DeleteMovement(int id)
+        {
+            try
+            {
+                var result = await _stockService.DeleteMovementAsync(id, CurrentEmployeeId);
                 return result ? Ok() : NotFound();
             }
             catch (Exception ex)
@@ -124,6 +196,20 @@ namespace KMG.Api.Controllers
             try
             {
                 return Ok(await _stockService.RecordPurchaseAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("purchase")]
+        [AuthorizeAbility("إدارة المخزن")]
+        public async Task<IActionResult> UpdatePurchase([FromBody] UpdatePurchaseDTO model)
+        {
+            try
+            {
+                return Ok(await _stockService.UpdatePurchaseAsync(model, CurrentEmployeeId));
             }
             catch (Exception ex)
             {

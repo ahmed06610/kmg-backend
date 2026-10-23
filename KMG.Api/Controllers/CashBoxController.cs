@@ -75,5 +75,19 @@ namespace KMG.Api.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpPut("adjust")]
+        [AuthorizeAbility("إدارة المصاريف")]
+        public async Task<IActionResult> AdjustBalance([FromBody] AdjustCashBoxDTO model)
+        {
+            try
+            {
+                return Ok(await _cashBoxService.AdjustBalanceAsync(model, CurrentEmployeeId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

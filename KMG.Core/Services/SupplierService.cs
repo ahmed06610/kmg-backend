@@ -39,7 +39,7 @@ namespace KMG.Core.Services
 
             if (supplier == null) return null;
 
-            var totalPurchases = supplier.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime);
+            var totalPurchases = TotalPurchasesOf(supplier.StockMovements);
             var totalPaid = CountedPayments(supplier.Payments).Sum(p => p.Amount);
 
             return new SupplierDetailsDTO
@@ -59,10 +59,15 @@ namespace KMG.Core.Services
                     .Select(m => new SupplierPurchaseDTO
                     {
                         Id = m.Id,
+                        MaterialId = m.MaterialId,
                         MaterialName = m.Material.Name,
                         Quantity = m.Quantity,
                         UnitPriceAtTime = m.UnitPriceAtTime,
-                        MovementDate = m.MovementDate
+                        TransportCost = m.TransportCost,
+                        MovementDate = m.MovementDate,
+                        Notes = m.Notes,
+                        AttachmentUrl = m.AttachmentUrl,
+                        AttachmentFileName = m.AttachmentFileName
                     }).ToList()
             };
         }
@@ -136,7 +141,7 @@ namespace KMG.Core.Services
                     .FirstOrDefaultAsync()
                     ?? throw new Exception("المورد غير موجود");
 
-                var totalPurchases = supplier.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime);
+                var totalPurchases = TotalPurchasesOf(supplier.StockMovements);
                 var totalPaid = CountedPayments(supplier.Payments).Sum(p => p.Amount);
                 var outstanding = totalPurchases - totalPaid;
 
@@ -154,6 +159,8 @@ namespace KMG.Core.Services
                     IsCheck = model.IsCheck,
                     CheckDueDate = model.IsCheck ? model.CheckDueDate : null,
                     CheckStatus = model.IsCheck ? Enums.CheckStatus.Pending : null,
+                    AttachmentUrl = model.AttachmentUrl,
+                    AttachmentFileName = model.AttachmentFileName,
                     CreatedByEmployeeId = createdByEmployeeId
                 };
 
@@ -207,7 +214,7 @@ namespace KMG.Core.Services
                     .FirstOrDefaultAsync() ?? throw new Exception("الدفعة غير موجودة");
 
                 var supplier = payment.Supplier;
-                var totalPurchases = supplier.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime);
+                var totalPurchases = TotalPurchasesOf(supplier.StockMovements);
                 var totalPaidExcludingThis = CountedPayments(supplier.Payments.Where(p => p.Id != payment.Id)).Sum(p => p.Amount);
 
                 if (totalPaidExcludingThis + newAmount > totalPurchases)
@@ -225,14 +232,17 @@ namespace KMG.Core.Services
                 payment.IsCheck = model.IsCheck;
                 payment.CheckDueDate = model.IsCheck ? model.CheckDueDate : null;
                 payment.CheckStatus = model.IsCheck ? (payment.CheckStatus ?? Enums.CheckStatus.Pending) : null;
+                payment.AttachmentUrl = model.AttachmentUrl;
+                payment.AttachmentFileName = model.AttachmentFileName;
                 _unitOfWork.SupplierPayment.Update(payment);
 
                 var shouldPostToCashBox = !payment.IsCheck || payment.CheckStatus == Enums.CheckStatus.Cleared;
                 if (shouldPostToCashBox)
                 {
+                    // الشيك المتصرف بيتخصم من رصيد الكريديت دايمًا (نفس منطق ResolveCheckAsync)
                     await _cashBoxService.RecordTransactionAsync(
-                        amountCash: -payment.AmountCash,
-                        amountCredit: -payment.AmountCredit,
+                        amountCash: payment.IsCheck ? 0 : -payment.AmountCash,
+                        amountCredit: payment.IsCheck ? -payment.Amount : -payment.AmountCredit,
                         type: TransactionType.SupplierPaymentOut,
                         description: $"تعديل دفعة للمورد: {supplier.Name}",
                         createdByEmployeeId: employeeId,
@@ -303,9 +313,10 @@ namespace KMG.Core.Services
                 switch (model.Action)
                 {
                     case CheckResolutionAction.Clear:
+                        // الشيك بيتصرف من حساب البنك، فقيمته بتتخصم من رصيد الكريديت مش الكاش
                         await _cashBoxService.RecordTransactionAsync(
-                            amountCash: -payment.AmountCash,
-                            amountCredit: -payment.AmountCredit,
+                            amountCash: 0,
+                            amountCredit: -payment.Amount,
                             type: TransactionType.SupplierPaymentOut,
                             description: $"صرف شيك للمورد: {payment.Supplier.Name}",
                             createdByEmployeeId: employeeId,
@@ -341,6 +352,10 @@ namespace KMG.Core.Services
         private static IEnumerable<SupplierPayment> CountedPayments(IEnumerable<SupplierPayment> payments) =>
             payments.Where(p => p.CheckStatus != Enums.CheckStatus.Cancelled);
 
+        // المستحق للمورد عن أي عملية شراء = سعر الخامة + أي تكلفة نقل مرتبطة بيها
+        private static decimal TotalPurchasesOf(IEnumerable<StockMovement> movements) =>
+            movements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime + m.TransportCost);
+
         private static SupplierPaymentDTO MapPayment(SupplierPayment p, string supplierName) => new()
         {
             Id = p.Id,
@@ -353,12 +368,14 @@ namespace KMG.Core.Services
             Notes = p.Notes,
             IsCheck = p.IsCheck,
             CheckDueDate = p.CheckDueDate,
-            CheckStatus = p.CheckStatus?.ToString()
+            CheckStatus = p.CheckStatus?.ToString(),
+            AttachmentUrl = p.AttachmentUrl,
+            AttachmentFileName = p.AttachmentFileName
         };
 
         private static SupplierListDTO MapList(Supplier s)
         {
-            var totalPurchases = s.StockMovements.Where(m => m.MovementType == MovementType.Purchase).Sum(m => m.Quantity * m.UnitPriceAtTime);
+            var totalPurchases = TotalPurchasesOf(s.StockMovements);
             var totalPaid = CountedPayments(s.Payments).Sum(p => p.Amount);
             return new SupplierListDTO
             {

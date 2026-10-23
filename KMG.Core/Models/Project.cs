@@ -14,9 +14,15 @@ namespace KMG.Core.Models
 
         public decimal ContractValue { get; set; }
 
-        // خاص بمشاريع المناقصات (تصنيع وتنفيذ)
-        public decimal? TenderInsuranceAmount { get; set; }
-        public decimal? TenderTaxAmount { get; set; }
+        // خاص بمشاريع المناقصات (تصنيع وتنفيذ) - نسب مش قيم مطلقة، بتتحسب على قيمة العقد
+        public decimal? TenderInsurancePercent { get; set; }
+        public decimal? TenderTaxPercent { get; set; }
+        public decimal? WorkGuaranteePercent { get; set; }
+
+        public DateTime? InsuranceDueDate { get; set; }
+        public bool InsuranceRecovered { get; set; }
+        public DateTime? WorkGuaranteeDueDate { get; set; }
+        public bool WorkGuaranteeRecovered { get; set; }
 
         // خاص بمشاريع التوريد
         public decimal? SupplyProfitMargin { get; set; }
@@ -37,6 +43,7 @@ namespace KMG.Core.Models
         public virtual ICollection<ProjectAudit> AuditLogs { get; set; } = new List<ProjectAudit>();
         public virtual ICollection<ProjectWriteOff> WriteOffs { get; set; } = new List<ProjectWriteOff>();
         public virtual ICollection<CashBoxTransaction> CashBoxTransactions { get; set; } = new List<CashBoxTransaction>();
+        public virtual ICollection<Custody> Custodies { get; set; } = new List<Custody>();
 
         // تكلفة الخامات = (صرف للمشروع - مرتجع من المشروع) بسعر وقت الحركة
         [NotMapped]
@@ -50,16 +57,55 @@ namespace KMG.Core.Models
         [NotMapped]
         public decimal TotalLaborCost => Missions.Sum(m => m.TotalLaborCost);
 
+        // عهدة المأمورية: لحد ما تتسوى بتتحسب بقيمتها كاملة (الفلوس خرجت فعلًا للمشروع)، وبعد التسوية
+        // بتتحسب بالمصروف الفعلي لحد قيمة العهدة - أي زيادة عن العهدة بتتسجل أصلًا كمصروف نثري
+        // (MissionSettlementDiff) فمحسوبة في TotalPettyExpenses ومينفعش تتحسب هنا تاني
         [NotMapped]
-        public decimal TotalCollected => Payments.Sum(p => p.Amount);
+        public decimal TotalMissionCustodyCost => Missions.Sum(m =>
+            m.Status == MissionStatus.Settled ? Math.Min(m.ActualSpent, m.AdvanceAmount) : m.AdvanceAmount);
+
+        // العهد الجانبية المربوطة بالمشروع: قبل التسوية بقيمتها كاملة، وبعدها بالمصروف الفعلي
+        // (فرق التسوية بالزيادة/النقص بيتسجل في الخزنة بس، مش كمصروف نثري منفصل)
+        [NotMapped]
+        public decimal TotalSideCustodyCost => Custodies.Sum(c =>
+            c.Status == CustodyStatus.Settled ? c.SettledAmount ?? c.Amount : c.Amount);
+
+        [NotMapped]
+        public decimal TotalCustodyCost => TotalMissionCustodyCost + TotalSideCustodyCost;
+
+        [NotMapped]
+        public decimal TotalCost => TotalMaterialsCost + TotalPettyExpenses + TotalLaborCost + TotalCustodyCost;
+
+        // الشيكات الملغية مش تحصيل فعلي
+        [NotMapped]
+        public decimal TotalCollected => Payments.Where(p => p.CheckStatus != CheckStatus.Cancelled).Sum(p => p.Amount);
 
         [NotMapped]
         public decimal TotalWriteOffs => WriteOffs.Sum(w => w.Amount);
 
         [NotMapped]
-        public decimal RemainingBalance => ContractValue - TotalCollected - TotalWriteOffs;
+        public decimal TenderInsuranceAmount => TenderInsurancePercent is > 0 ? ContractValue * TenderInsurancePercent.Value / 100m : 0;
 
         [NotMapped]
-        public decimal NetProfit => ContractValue - (TotalMaterialsCost + TotalPettyExpenses + TotalLaborCost);
+        public decimal TenderTaxAmount => TenderTaxPercent is > 0 ? ContractValue * TenderTaxPercent.Value / 100m : 0;
+
+        [NotMapped]
+        public decimal WorkGuaranteeAmount => WorkGuaranteePercent is > 0 ? ContractValue * WorkGuaranteePercent.Value / 100m : 0;
+
+        // الضريبة بتزود المبلغ المطلوب تحصيله فعليًا من العميل - مش رقم عرض بس
+        [NotMapped]
+        public decimal ContractValueWithTax => ContractValue + TenderTaxAmount;
+
+        [NotMapped]
+        public decimal RemainingBalance => ContractValueWithTax - TotalCollected - TotalWriteOffs;
+
+        // قيمة العقد الفعلية بعد خصم أعمال متعذر تحصيلها - القيمة الأصلية (ContractValue) بتفضل
+        // زي ما هي كرقم تعاقدي، دي بس "الواقعي" اللي المفروض نتوقعه فعلًا
+        [NotMapped]
+        public decimal EffectiveContractValue => ContractValueWithTax - TotalWriteOffs;
+
+        // خصم الأعمال معناه إننا مش هنحصّل الجزء ده من قيمة العقد خالص - لازم يترجم لخسارة فعلية في الربح
+        [NotMapped]
+        public decimal NetProfit => ContractValue - TotalCost - TotalWriteOffs;
     }
 }

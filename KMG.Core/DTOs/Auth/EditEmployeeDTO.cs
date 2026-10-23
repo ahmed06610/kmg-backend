@@ -16,6 +16,8 @@ namespace KMG.Core.DTOs.Auth
         public EmployeeType EmployeeType { get; set; }
         public WageType WageType { get; set; }
         public decimal WageAmount { get; set; }
+        public decimal InsuranceAmount { get; set; }
+        public decimal MisrInsuranceAmount { get; set; }
         public List<int>? AbilityIds { get; set; }
     }
 }

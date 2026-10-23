@@ -38,14 +38,22 @@ namespace KMG.EF.Data
         public DbSet<Advance> Advances { get; set; } = null!;
         public DbSet<PayrollAdjustment> PayrollAdjustments { get; set; } = null!;
         public DbSet<PayrollPayout> PayrollPayouts { get; set; } = null!;
+        public DbSet<PayrollAdvanceCharge> PayrollAdvanceCharges { get; set; } = null!;
 
         public DbSet<CashBox> CashBoxes { get; set; } = null!;
         public DbSet<CashBoxTransaction> CashBoxTransactions { get; set; } = null!;
         public DbSet<MiscExpense> MiscExpenses { get; set; } = null!;
+        public DbSet<Custody> Custodies { get; set; } = null!;
+        public DbSet<InsurancePayout> InsurancePayouts { get; set; } = null!;
+        public DbSet<MisrInsurancePayout> MisrInsurancePayouts { get; set; } = null!;
 
         public DbSet<AiPromptConfig> AiPromptConfigs { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<AiTenderResult> AiTenderResults { get; set; } = null!;
+        public DbSet<AiChatMessage> AiChatMessages { get; set; } = null!;
+
+        public DbSet<GeneratedInvoice> GeneratedInvoices { get; set; } = null!;
+        public DbSet<GeneratedInvoiceLineItem> GeneratedInvoiceLineItems { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -298,6 +306,24 @@ namespace KMG.EF.Data
                 .HasForeignKey(pp => pp.CreatedByEmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<PayrollAdjustment>()
+                .HasOne(pa => pa.AppliedInPayrollPayout)
+                .WithMany()
+                .HasForeignKey(pa => pa.AppliedInPayrollPayoutId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PayrollAdvanceCharge>()
+                .HasOne(c => c.PayrollPayout)
+                .WithMany(pp => pp.AdvanceCharges)
+                .HasForeignKey(c => c.PayrollPayoutId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PayrollAdvanceCharge>()
+                .HasOne(c => c.Advance)
+                .WithMany()
+                .HasForeignKey(c => c.AdvanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ---------- CashBox ----------
             modelBuilder.Entity<CashBoxTransaction>()
                 .HasOne(t => t.CashBox)
@@ -359,10 +385,35 @@ namespace KMG.EF.Data
                 .HasForeignKey(t => t.MiscExpenseId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<CashBoxTransaction>()
+                .HasOne(t => t.Custody)
+                .WithMany(c => c.CashBoxTransactions)
+                .HasForeignKey(t => t.CustodyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CashBoxTransaction>()
+                .HasOne(t => t.StockMovement)
+                .WithMany()
+                .HasForeignKey(t => t.StockMovementId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<MiscExpense>()
                 .HasOne(m => m.CreatedByEmployee)
                 .WithMany()
                 .HasForeignKey(m => m.CreatedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ---------- Custody (عهدة جانبية) ----------
+            modelBuilder.Entity<Custody>()
+                .HasOne(c => c.Employee)
+                .WithMany()
+                .HasForeignKey(c => c.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Custody>()
+                .HasOne(c => c.Project)
+                .WithMany(p => p.Custodies)
+                .HasForeignKey(c => c.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<CashBoxTransaction>()
@@ -384,6 +435,44 @@ namespace KMG.EF.Data
             modelBuilder.Entity<AiTenderResult>()
                 .HasIndex(t => t.TenderId)
                 .IsUnique();
+
+            // ---------- محادثة الـ AI ----------
+            modelBuilder.Entity<AiChatMessage>(entity =>
+            {
+                entity.Property(m => m.Role).HasMaxLength(20).IsRequired();
+                entity.Property(m => m.Content).IsRequired();
+
+                // تحميل الرسايل بيبقى دايمًا لمستخدم واحد بالـ Id تنازليًا (أحدث دفعة ثم اللي قبلها)
+                entity.HasIndex(m => new { m.EmployeeId, m.Id });
+
+                entity.HasOne(m => m.Employee)
+                    .WithMany()
+                    .HasForeignKey(m => m.EmployeeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ---------- Invoices ----------
+            modelBuilder.Entity<GeneratedInvoice>()
+                .HasIndex(i => i.InvoiceNumber)
+                .IsUnique();
+
+            modelBuilder.Entity<GeneratedInvoice>()
+                .HasOne(i => i.Project)
+                .WithMany()
+                .HasForeignKey(i => i.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GeneratedInvoice>()
+                .HasOne(i => i.CreatedByEmployee)
+                .WithMany()
+                .HasForeignKey(i => i.CreatedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GeneratedInvoiceLineItem>()
+                .HasOne(li => li.GeneratedInvoice)
+                .WithMany(i => i.LineItems)
+                .HasForeignKey(li => li.GeneratedInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

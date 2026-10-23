@@ -32,14 +32,20 @@ namespace KMG.Core.Interfaces
         IAdvanceRepository Advance { get; }
         IPayrollAdjustmentRepository PayrollAdjustment { get; }
         IPayrollPayoutRepository PayrollPayout { get; }
+        IPayrollAdvanceChargeRepository PayrollAdvanceCharge { get; }
 
         ICashBoxRepository CashBox { get; }
         ICashBoxTransactionRepository CashBoxTransaction { get; }
         IMiscExpenseRepository MiscExpense { get; }
+        ICustodyRepository Custody { get; }
+        IInsurancePayoutRepository InsurancePayout { get; }
+        IMisrInsurancePayoutRepository MisrInsurancePayout { get; }
 
         IAiPromptConfigRepository AiPromptConfig { get; }
         INotificationRepository Notification { get; }
         IAiTenderResultRepository AiTenderResult { get; }
+        IAiChatMessageRepository AiChatMessage { get; }
+        IGeneratedInvoiceRepository GeneratedInvoice { get; }
 
         Task<int> CompleteAsync();
         Task RollbackAsync();

@@ -34,15 +34,22 @@ namespace KMG.Core.DTOs.Supplier
         public bool IsCheck { get; set; }
         public DateTime? CheckDueDate { get; set; }
         public string? CheckStatus { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class SupplierPurchaseDTO
     {
         public int Id { get; set; }
+        public int MaterialId { get; set; }
         public string MaterialName { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
         public decimal UnitPriceAtTime { get; set; }
+        public decimal TransportCost { get; set; }
         public DateTime MovementDate { get; set; }
+        public string? Notes { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class CreateSupplierDTO
@@ -67,6 +74,8 @@ namespace KMG.Core.DTOs.Supplier
         public string? Notes { get; set; }
         public bool IsCheck { get; set; }
         public DateTime? CheckDueDate { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class UpdateSupplierPaymentDTO
@@ -78,6 +87,8 @@ namespace KMG.Core.DTOs.Supplier
         public string? Notes { get; set; }
         public bool IsCheck { get; set; }
         public DateTime? CheckDueDate { get; set; }
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentFileName { get; set; }
     }
 
     public class ResolveCheckDTO

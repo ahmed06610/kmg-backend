@@ -24,26 +24,30 @@ namespace KMG.Core.Services
                  .Include(m => m.ForemanEmployee)
                  .Include(m => m.MissionWorkers).ThenInclude(w => w.Employee);
 
-        public async Task<List<MissionListDTO>> GetByProjectAsync(int projectId)
+        public async Task<List<MissionDetailsDTO>> GetByProjectAsync(int projectId)
         {
             var missions = await IncludeAll(_unitOfWork.Mission.GetQueryable(m => m.ProjectId == projectId))
                 .OrderByDescending(m => m.StartDate)
                 .ToListAsync();
 
-            return missions.Select(MapList).ToList();
+            return missions.Select(MapDetails).ToList();
         }
 
         public async Task<MissionDetailsDTO?> GetByIdAsync(int id)
         {
             var mission = await IncludeAll(_unitOfWork.Mission.GetQueryable(m => m.Id == id)).FirstOrDefaultAsync();
-            if (mission == null) return null;
+            return mission == null ? null : MapDetails(mission);
+        }
 
+        private static MissionDetailsDTO MapDetails(Mission mission)
+        {
             var list = MapList(mission);
             return new MissionDetailsDTO
             {
                 Id = list.Id,
                 ProjectId = list.ProjectId,
                 ProjectCode = list.ProjectCode,
+                ForemanEmployeeId = list.ForemanEmployeeId,
                 ForemanName = list.ForemanName,
                 StartDate = list.StartDate,
                 EndDate = list.EndDate,
@@ -57,7 +61,8 @@ namespace KMG.Core.Services
                 {
                     EmployeeId = w.EmployeeId,
                     EmployeeName = w.Employee.Name,
-                    DaysCount = w.DaysCount
+                    DaysCount = w.DaysCount,
+                    DailyRate = w.DailyRate
                 }).ToList()
             };
         }
@@ -90,7 +95,8 @@ namespace KMG.Core.Services
                     {
                         MissionId = mission.Id,
                         EmployeeId = worker.EmployeeId,
-                        DaysCount = worker.DaysCount
+                        DaysCount = worker.DaysCount,
+                        DailyRate = worker.DailyRate
                     });
                 }
 
@@ -205,15 +211,31 @@ namespace KMG.Core.Services
 
         public async Task<MissionDetailsDTO> UpdateAsync(UpdateMissionDTO model, int employeeId)
         {
+            if (model.Workers.Count == 0)
+                throw new Exception("لازم عامل واحد على الأقل في المأمورية");
+
             using var transaction = await _unitOfWork.BeginTransactionAsync();
             try
             {
                 var mission = await _unitOfWork.Mission.GetQueryable(m => m.Id == model.MissionId)
                     .Include(m => m.Project)
+                    .Include(m => m.MissionWorkers)
                     .FirstOrDefaultAsync() ?? throw new Exception("المأمورية غير موجودة");
 
                 if (mission.Status != MissionStatus.Open)
                     throw new Exception("لا يمكن تعديل مأمورية متسواة بالفعل");
+
+                _unitOfWork.MissionWorker.DeleteRange(mission.MissionWorkers);
+                foreach (var worker in model.Workers)
+                {
+                    await _unitOfWork.MissionWorker.AddAsync(new MissionWorker
+                    {
+                        MissionId = mission.Id,
+                        EmployeeId = worker.EmployeeId,
+                        DaysCount = worker.DaysCount,
+                        DailyRate = worker.DailyRate
+                    });
+                }
 
                 if (mission.AdvanceAmount != model.AdvanceAmount)
                 {
