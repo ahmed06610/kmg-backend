@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KMG.Core", "KMG.Core\KMG.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KMG.EF", "KMG.EF\KMG.EF.csproj", "{A60166B9-9609-419E-94D4-37244113688E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KMG.Tests", "KMG.Tests\KMG.Tests.csproj", "{3E89B2DF-F36D-468C-BB8F-25B198F334DE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{A60166B9-9609-419E-94D4-37244113688E}.Release|x64.Build.0 = Release|Any CPU
 		{A60166B9-9609-419E-94D4-37244113688E}.Release|x86.ActiveCfg = Release|Any CPU
 		{A60166B9-9609-419E-94D4-37244113688E}.Release|x86.Build.0 = Release|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Debug|x64.Build.0 = Debug|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Debug|x86.Build.0 = Debug|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Release|x64.ActiveCfg = Release|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Release|x64.Build.0 = Release|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Release|x86.ActiveCfg = Release|Any CPU
+		{3E89B2DF-F36D-468C-BB8F-25B198F334DE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -39,6 +39,18 @@ namespace KMG.Core.Services
             return mission == null ? null : MapDetails(mission);
         }
 
+        public async Task<List<MissionDetailsDTO>> GetRecentAsync(MissionStatus? status, int take)
+        {
+            var missions = await IncludeAll(_unitOfWork.Mission.GetQueryable(m => status == null || m.Status == status))
+                .OrderByDescending(m => m.StartDate)
+                .Take(take)
+                .AsSplitQuery()
+                .AsNoTracking()
+                .ToListAsync();
+
+            return missions.Select(MapDetails).ToList();
+        }
+
         private static MissionDetailsDTO MapDetails(Mission mission)
         {
             var list = MapList(mission);

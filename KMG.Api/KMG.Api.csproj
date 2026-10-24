@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>b371db4b-bfb6-48fc-a216-241e9ccf7fc6</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,10 @@
   <ItemGroup>
     <ProjectReference Include="..\KMG.Core\KMG.Core.csproj" />
     <ProjectReference Include="..\KMG.EF\KMG.EF.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KMG.Tests" />
   </ItemGroup>
 
 </Project>

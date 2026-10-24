@@ -88,6 +88,23 @@ Swagger على `/swagger` وقت التشغيل في Development.
 - SignalR + Hangfire (إشعارات لحظية ومهام مجدولة زي تنبيه نقص المخزون الدوري)
 - وحدة الذكاء الاصطناعي لرصد المناقصات
 
+## مساعد الـ AI (محادثة Gemini)
+
+`POST /api/AiChat/send` بيكلم Gemini مباشرة من الباك اند (`KMG.Api/Ai/`) بأدوات **قراءة فقط**
+(ملخص الشركة، المشاريع، تفاصيل مشروع، الخامات، التنبيهات، نتائج المناقصات اللي n8n بيضيفها).
+كل أداة بتتفحص بنفس صلاحيات الـ Ability بتاعة الشاشات، فالمحادثة مش بتعرض أي حاجة المستخدم مش مسموح له يشوفها.
+
+مفتاح Gemini **مايتحطش في appsettings أبدًا** - محليًا بالـ User Secrets:
+
+```bash
+dotnet user-secrets set "Ai:Gemini:ApiKey" "<key>" --project KMG.Api
+```
+
+وعلى السيرفر كـ Environment Variable: `Ai__Gemini__ApiKey`. باقي الإعدادات (`Ai:Gemini:ChatModel`,
+`Ai:Gemini:TimeoutSeconds`, و`Ai:Gemini:ThinkingLevel` الاختياري) في `appsettings.json`.
+
+تكامل n8n للمناقصات (`AiContext/data` و`AiContext/aiResults` بمفتاح `AiIntegration:ApiKey`) زي ما هو من غير تغيير.
+
 ## أوامر EF Core مفيدة
 
 ```bash
